@@ -158,6 +158,7 @@ static void cb_dds_flush(const void *data, size_t bytes,
 	size_t off = 0;
 	struct flb_out_dds_config *ctx = out_context;
 	struct flb_time tms;
+        size_t count = 0;
 	msgpack_object *obj;
 	msgpack_unpacked result;
 	msgpack_object key;
@@ -167,6 +168,7 @@ static void cb_dds_flush(const void *data, size_t bytes,
 
 	msgpack_unpacked_init(&result);
 
+        flb_debug("OUT-DDS: got to flush some sample...");
 	while(msgpack_unpack_next(&result, data, bytes, &off) == MSGPACK_UNPACK_SUCCESS) {
 		flb_time_pop_from_msgpack(&tms, &result, &obj);
 
@@ -217,6 +219,7 @@ static void cb_dds_flush(const void *data, size_t bytes,
 			}
 		}
 
+                flb_debug("OUT-DDS: Writing record #%d (%d fields)", ++count, obj->via.map.size);
 		retcode = FBDataWriter_write(ctx->fb_writer, ctx->instance, &(ctx->instance_handle));
 		if (retcode != DDS_RETCODE_OK) {
 			flb_warn("[%s] writer error %d", __FUNCTION__, retcode);
