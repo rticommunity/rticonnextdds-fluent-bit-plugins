@@ -1,0 +1,43 @@
+const long MAX_RECORDS = 128;
+const long MAX_STR_LEN = 1024;
+
+enum ValueKind {
+	NIL,
+	BOOLEAN,
+	POSITIVE_INTEGER,
+	NEGATIVE_INTEGER,
+	FLOAT32,
+	FLOAT64,
+	FLOAT,
+	STR,
+	ARRAY,
+	MAP,
+	BIN,
+	EXT
+};
+
+union Value switch (ValueKind) {
+	case BOOLEAN:
+		boolean b;
+	case POSITIVE_INTEGER:
+		unsigned long long u64;
+	case NEGATIVE_INTEGER:
+		long long i64;
+	case FLOAT32:
+		float f32;
+	case FLOAT64:
+		double f64;
+	case STR:
+		string<MAX_STR_LEN> str;
+};
+
+struct Record {
+    string key;
+    Value value;
+};
+
+struct FB {
+    double ts;
+    string tag;//@key
+    sequence<Record, MAX_RECORDS> records;
+};

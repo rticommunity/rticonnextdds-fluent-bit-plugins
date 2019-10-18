@@ -1,0 +1,9 @@
+lib_LTLIBRARIES = libflb_out_dds.la
+
+libflb_out_dds_la_LIBADD = @RTI_LIBS@
+libflb_out_dds_la_SOURCES = out_dds.c \
+    			fb.c  \
+			fbPlugin.c \
+			fbSupport.c  
+libflb_out_dds_la_LDFLAGS = -module -avoid-version -shared -export-dynamic
+
