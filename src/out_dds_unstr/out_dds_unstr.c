@@ -1,4 +1,6 @@
-#include "out_dds.h"
+#include "out_dds_unstr.h"
+
+#define PLUGIN_NAME         "out_dds_unstr"
 
 static int dds_shutdown(DDS_DomainParticipant *participant)
 {
@@ -8,13 +10,13 @@ static int dds_shutdown(DDS_DomainParticipant *participant)
     if (participant != NULL) {
         retcode = DDS_DomainParticipant_delete_contained_entities(participant);
         if (retcode != DDS_RETCODE_OK) {
-            flb_error("[out_dds] delete_contained_entities error %d\n", retcode);
+            flb_error("[%s] delete_contained_entities error %d\n", PLUGIN_NAME, retcode);
             status = -1;
         }
         retcode = DDS_DomainParticipantFactory_delete_participant(
             DDS_TheParticipantFactory, participant);
         if (retcode != DDS_RETCODE_OK) {
-            flb_error("[out_dds] delete_participant error %d\n", retcode);
+            flb_error("[%s] delete_participant error %d\n", PLUGIN_NAME, retcode);
             status = -1;
         }
     }
@@ -36,11 +38,11 @@ static int cb_dds_init(struct flb_output_instance *ins,
 		struct flb_config *config,
 		void *data)
 {   
-	struct flb_out_dds_config *ctx;
+	struct flb_out_dds_unstr_config *ctx;
 	const char *tmp = NULL;
 	DDS_ReturnCode_t retcode;
 
-	ctx = flb_calloc(1, sizeof(struct flb_out_dds_config));
+	ctx = flb_calloc(1, sizeof(struct flb_out_dds_unstr_config));
 	if (!ctx) {
 		flb_errno();
 		return -1;
@@ -61,7 +63,7 @@ static int cb_dds_init(struct flb_output_instance *ins,
 			DDS_TheParticipantFactory, ctx->domain_id, &DDS_PARTICIPANT_QOS_DEFAULT,
 			NULL /* listener */, DDS_STATUS_MASK_NONE);
 	if (ctx->participant == NULL) {
-		flb_error("[out_dds] create_participant error\n");
+		flb_error("[%s] create_participant error\n", PLUGIN_NAME);
 		dds_shutdown(ctx->participant);
 		flb_errno();
 		return -1;
@@ -73,7 +75,7 @@ static int cb_dds_init(struct flb_output_instance *ins,
 			ctx->participant, &DDS_PUBLISHER_QOS_DEFAULT, NULL /* listener */,
 			DDS_STATUS_MASK_NONE);
 	if (ctx->publisher == NULL) {
-		flb_error("[out_dds] create_publisher error\n");
+		flb_error("[%s] create_publisher error\n", PLUGIN_NAME);
 		dds_shutdown(ctx->participant);
 		flb_errno();
 		return -1;
@@ -84,7 +86,7 @@ static int cb_dds_init(struct flb_output_instance *ins,
 	retcode = FBTypeSupport_register_type(
 			ctx->participant, ctx->type_name);
 	if (retcode != DDS_RETCODE_OK) {
-		flb_error("[out_dds] register_type error %d\n", retcode);
+		flb_error("[%s] register_type error %d\n", PLUGIN_NAME, retcode);
 		dds_shutdown(ctx->participant);
 		flb_errno();
 		return -1;
@@ -97,7 +99,7 @@ static int cb_dds_init(struct flb_output_instance *ins,
 			ctx->type_name, &DDS_TOPIC_QOS_DEFAULT, NULL /* listener */,
 			DDS_STATUS_MASK_NONE);
 	if (ctx->topic == NULL) {
-		flb_error(" [out_dds] create_topic error\n");
+		flb_error(" [%s] create_topic error\n", PLUGIN_NAME);
 		dds_shutdown(ctx->participant);
 		flb_errno();
 		return -1;
@@ -109,7 +111,7 @@ static int cb_dds_init(struct flb_output_instance *ins,
 			ctx->publisher, ctx->topic,
 			&DDS_DATAWRITER_QOS_DEFAULT, NULL /* listener */, DDS_STATUS_MASK_NONE);
 	if (ctx->writer == NULL) {
-		flb_error("[out_dds] create_datawriter error\n");
+		flb_error("[%s] create_datawriter error\n", PLUGIN_NAME);
 		dds_shutdown(ctx->participant);
 		flb_errno();
 		return -1;
@@ -117,7 +119,7 @@ static int cb_dds_init(struct flb_output_instance *ins,
 
 	ctx->fb_writer = FBDataWriter_narrow(ctx->writer);
 	if (ctx->fb_writer == NULL) {
-		flb_error("[out_dds] DataWriter narrow error\n");
+		flb_error("[%s] DataWriter narrow error\n", PLUGIN_NAME);
 		dds_shutdown(ctx->participant);
 		flb_errno();
 		return -1;
@@ -126,7 +128,7 @@ static int cb_dds_init(struct flb_output_instance *ins,
 	/* Create data sample for writing */
 	ctx->instance = FBTypeSupport_create_data_ex(DDS_BOOLEAN_TRUE);
 	if (ctx->instance == NULL) {
-		flb_error("[out_dds] FBTypeSupport_create_data error\n");
+		flb_error("[%s] FBTypeSupport_create_data error\n", PLUGIN_NAME);
 		dds_shutdown(ctx->participant);
 		flb_errno();
 		return -1;
@@ -144,7 +146,7 @@ static int cb_dds_init(struct flb_output_instance *ins,
 
 	/* Export context */
 	flb_output_set_context(ins, ctx);
-	flb_info("[out_dds] domain_id=%d", ctx->domain_id);
+	flb_info("[%s] domain_id=%d", ctx->domain_id, PLUGIN_NAME);
 	return 0;
 }
 
@@ -156,7 +158,7 @@ static void cb_dds_flush(const void *data, size_t bytes,
 
 	int i;
 	size_t off = 0;
-	struct flb_out_dds_config *ctx = out_context;
+	struct flb_out_dds_unstr_config *ctx = out_context;
 	struct flb_time tms;
         size_t count = 0;
 	msgpack_object *obj;
@@ -168,7 +170,7 @@ static void cb_dds_flush(const void *data, size_t bytes,
 
 	msgpack_unpacked_init(&result);
 
-        flb_debug("OUT-DDS: got to flush some sample...");
+        flb_debug("[%s]: got to flush some sample...", PLUGIN_NAME);
 	while(msgpack_unpack_next(&result, data, bytes, &off) == MSGPACK_UNPACK_SUCCESS) {
 		flb_time_pop_from_msgpack(&tms, &result, &obj);
 
@@ -219,10 +221,10 @@ static void cb_dds_flush(const void *data, size_t bytes,
 			}
 		}
 
-                flb_debug("OUT-DDS: Writing record #%d (%d fields)", ++count, obj->via.map.size);
+                flb_debug("[%s]: Writing record #%d (%d fields)", PLUGIN_NAME, ++count, obj->via.map.size);
 		retcode = FBDataWriter_write(ctx->fb_writer, ctx->instance, &(ctx->instance_handle));
 		if (retcode != DDS_RETCODE_OK) {
-			flb_warn("[%s] writer error %d", __FUNCTION__, retcode);
+			flb_warn("[%s] writer error %d", PLUGIN_NAME, retcode);
 		}
 		RecordSeq_set_length(&ctx->instance->records, 0);
 	}
@@ -232,7 +234,7 @@ static void cb_dds_flush(const void *data, size_t bytes,
 }
 
 static int cb_dds_exit(void *data, struct flb_config *config) {
-	struct flb_out_dds_config *ctx = data;
+	struct flb_out_dds_unstr_config *ctx = data;
 	if (!ctx) {
 		return 0;
 	}
@@ -247,9 +249,9 @@ static int cb_dds_exit(void *data, struct flb_config *config) {
 	return 0;
 }
 
-struct flb_output_plugin out_dds_plugin = {
+struct flb_output_plugin out_dds_unstr_plugin = {
 	.name         = "dds",
-	.description  = "DDS Output Plugin",
+	.description  = "DDS Unstructured Output Plugin",
 	.cb_init      = cb_dds_init,
 	.cb_flush     = cb_dds_flush,
 	.cb_exit      = cb_dds_exit,

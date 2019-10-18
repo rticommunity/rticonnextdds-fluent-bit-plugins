@@ -1,5 +1,5 @@
 ACLOCAL_AMFLAGS = -I m4
-SUBDIRS = src
+SUBDIRS = src/out_dds_unstr
 
 install-data-local:
-	(cd ${prefix}/lib; ln -sf libflb_out_dds.so ./flb-out_dds.so)
+	(cd ${prefix}/lib; ln -sf libflb_out_dds_str.so ./flb-out_dds_str.so)

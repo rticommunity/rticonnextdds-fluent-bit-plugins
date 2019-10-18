@@ -11,7 +11,7 @@
 #include "fb.h"
 #include "fbSupport.h"
 
-struct flb_out_dds_config {
+struct flb_out_dds_unstr_config {
 	int domain_id;
 
 	DDS_DomainParticipant *participant;

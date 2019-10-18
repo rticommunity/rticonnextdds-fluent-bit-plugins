@@ -3,7 +3,7 @@ dnl (c) Copyright 2018, Real-Time Innovations, Inc. All rights reserved.
 dnl **********************************************************************************
 
 AC_INIT(flb-out_dds, 1.0, fabrizio@rti.com)
-AC_CONFIG_SRCDIR([src/out_dds.c])
+AC_CONFIG_SRCDIR([src/out_dds_unstr/out_dds_unstr.c])
 LT_INIT([dlopen])
 
 
@@ -180,5 +180,5 @@ RTI_LIBS="-lnddsc${RTI_LIBSUFFIX} -lnddscore${RTI_LIBSUFFIX} ${RTI_SYSLIBS} -lfl
 
 AC_SUBST(RTI_LIBS, "${RTI_LIBS}")
 
-AC_OUTPUT(Makefile src/Makefile)
+AC_OUTPUT(Makefile src/out_dds_unstr/Makefile)
 
