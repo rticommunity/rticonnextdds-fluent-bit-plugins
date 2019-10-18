@@ -9,8 +9,8 @@ For more information, type 'rtiddsgen -help' at a command shell
 or consult the RTI Connext manual.
 */
 
-#ifndef fb_1282814932_h
-#define fb_1282814932_h
+#ifndef fb_1282815016_h
+#define fb_1282815016_h
 
 #ifndef NDDS_STANDALONE_TYPE
 #ifndef ndds_c_h
@@ -23,6 +23,10 @@ or consult the RTI Connext manual.
 #define MAX_RECORDS (128)
 
 #define MAX_STR_LEN (1024)
+
+#define MAX_TAG_LEN (64)
+
+#define MAX_KEY_LEN (64)
 typedef enum ValueKind
 {
     NIL ,      

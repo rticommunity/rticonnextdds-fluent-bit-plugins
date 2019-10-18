@@ -1068,7 +1068,7 @@ DDS_TypeCode* Record_get_typecode()
 {
     static RTIBool is_initialized = RTI_FALSE;
 
-    static DDS_TypeCode Record_g_tc_key_string = DDS_INITIALIZE_STRING_TYPECODE((255));
+    static DDS_TypeCode Record_g_tc_key_string = DDS_INITIALIZE_STRING_TYPECODE(((MAX_KEY_LEN)));
 
     static DDS_TypeCode_Member Record_g_tc_members[2]=
     {
@@ -1253,11 +1253,11 @@ RTIBool Record_initialize_w_params(
     }
 
     if (allocParams->allocate_memory) {
-        sample->key = DDS_String_alloc((255));
+        sample->key = DDS_String_alloc(((MAX_KEY_LEN)));
         RTICdrType_copyStringEx(
             &sample->key,
             "",
-            (255),
+            ((MAX_KEY_LEN)),
             RTI_FALSE);
         if (sample->key == NULL) {
             return RTI_FALSE;
@@ -1267,7 +1267,7 @@ RTIBool Record_initialize_w_params(
             RTICdrType_copyStringEx(
                 &sample->key,
                 "",
-                (255),
+                ((MAX_KEY_LEN)),
                 RTI_FALSE);
             if (sample->key == NULL) {
                 return RTI_FALSE;
@@ -1356,7 +1356,7 @@ RTIBool Record_copy(
 
     if (!RTICdrType_copyStringEx (
         &dst->key, src->key, 
-        (255) + 1, RTI_FALSE)){
+        ((MAX_KEY_LEN)) + 1, RTI_FALSE)){
         return RTI_FALSE;
     }
     if (!Value_copy(
@@ -1405,7 +1405,7 @@ DDS_TypeCode* FB_get_typecode()
 {
     static RTIBool is_initialized = RTI_FALSE;
 
-    static DDS_TypeCode FB_g_tc_tag_string = DDS_INITIALIZE_STRING_TYPECODE((255));
+    static DDS_TypeCode FB_g_tc_tag_string = DDS_INITIALIZE_STRING_TYPECODE(((MAX_TAG_LEN)));
     static DDS_TypeCode FB_g_tc_records_sequence = DDS_INITIALIZE_SEQUENCE_TYPECODE(((MAX_RECORDS)),NULL);
 
     static DDS_TypeCode_Member FB_g_tc_members[3]=
@@ -1627,11 +1627,11 @@ RTIBool FB_initialize_w_params(
     sample->ts = 0.0;
 
     if (allocParams->allocate_memory) {
-        sample->tag = DDS_String_alloc((255));
+        sample->tag = DDS_String_alloc(((MAX_TAG_LEN)));
         RTICdrType_copyStringEx(
             &sample->tag,
             "",
-            (255),
+            ((MAX_TAG_LEN)),
             RTI_FALSE);
         if (sample->tag == NULL) {
             return RTI_FALSE;
@@ -1641,7 +1641,7 @@ RTIBool FB_initialize_w_params(
             RTICdrType_copyStringEx(
                 &sample->tag,
                 "",
-                (255),
+                ((MAX_TAG_LEN)),
                 RTI_FALSE);
             if (sample->tag == NULL) {
                 return RTI_FALSE;
@@ -1765,7 +1765,7 @@ RTIBool FB_copy(
     }
     if (!RTICdrType_copyStringEx (
         &dst->tag, src->tag, 
-        (255) + 1, RTI_FALSE)){
+        ((MAX_TAG_LEN)) + 1, RTI_FALSE)){
         return RTI_FALSE;
     }
     if (!RecordSeq_copy(&dst->records ,

@@ -2251,7 +2251,7 @@ FBPlugin_instance_to_key(
 
     if (!RTICdrType_copyStringEx (
         &dst->tag, src->tag, 
-        (255) + 1, RTI_FALSE)){
+        ((MAX_TAG_LEN)) + 1, RTI_FALSE)){
         return RTI_FALSE;
     }
     return RTI_TRUE;
@@ -2266,7 +2266,7 @@ FBPlugin_key_to_instance(
     if (endpoint_data) {} /* To avoid warnings */   
     if (!RTICdrType_copyStringEx (
         &dst->tag, src->tag, 
-        (255) + 1, RTI_FALSE)){
+        ((MAX_TAG_LEN)) + 1, RTI_FALSE)){
         return RTI_FALSE;
     }
     return RTI_TRUE;

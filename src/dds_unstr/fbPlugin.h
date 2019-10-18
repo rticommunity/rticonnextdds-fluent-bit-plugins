@@ -9,8 +9,8 @@ For more information, type 'rtiddsgen -help' at a command shell
 or consult the RTI Connext manual.
 */
 
-#ifndef fbPlugin_1282814932_h
-#define fbPlugin_1282814932_h
+#ifndef fbPlugin_1282815016_h
+#define fbPlugin_1282815016_h
 
 #include "fb.h"
 
@@ -646,5 +646,5 @@ FBPlugin_delete(struct PRESTypePlugin *);
 #define NDDSUSERDllExport
 #endif
 
-#endif /* fbPlugin_1282814932_h */
+#endif /* fbPlugin_1282815016_h */
 

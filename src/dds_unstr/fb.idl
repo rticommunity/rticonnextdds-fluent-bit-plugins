@@ -1,5 +1,7 @@
 const long MAX_RECORDS = 128;
 const long MAX_STR_LEN = 1024;
+const long MAX_TAG_LEN = 64;
+const long MAX_KEY_LEN = 64;
 
 enum ValueKind {
 	NIL,
@@ -32,12 +34,12 @@ union Value switch (ValueKind) {
 };
 
 struct Record {
-    string key;
+    string<MAX_KEY_LEN> key;
     Value value;
 };
 
 struct FB {
     double ts;
-    string tag;//@key
+    string<MAX_TAG_LEN> tag;//@key
     sequence<Record, MAX_RECORDS> records;
 };
