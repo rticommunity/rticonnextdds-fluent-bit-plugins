@@ -146,7 +146,7 @@ static int cb_dds_init(struct flb_output_instance *ins,
 
 	/* Export context */
 	flb_output_set_context(ins, ctx);
-	flb_info("[%s] domain_id=%d", ctx->domain_id, PLUGIN_NAME);
+	flb_info("[%s] domain_id=%d", PLUGIN_NAME, ctx->domain_id);
 	return 0;
 }
 
@@ -156,7 +156,7 @@ static void cb_dds_flush(const void *data, size_t bytes,
 		void *out_context,
 		struct flb_config *config) {
 
-	int i;
+	size_t i;
 	size_t off = 0;
 	struct flb_out_dds_unstr_config *ctx = out_context;
 	struct flb_time tms;
@@ -250,7 +250,7 @@ static int cb_dds_exit(void *data, struct flb_config *config) {
 }
 
 struct flb_output_plugin out_dds_unstr_plugin = {
-	.name         = "dds",
+	.name         = "dds_unstr",
 	.description  = "DDS Unstructured Output Plugin",
 	.cb_init      = cb_dds_init,
 	.cb_flush     = cb_dds_flush,

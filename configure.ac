@@ -81,9 +81,9 @@ dnl ****************************************************************************
 AC_ARG_ENABLE(warnings,
 [  --enable-warnings       enable compiler warnings during build ],
 [
-        CFLAGS="$CFLAGS -Wall -Wpointer-arith -Wwrite-strings -Wconversion -Wcast-qual -W"
+        CFLAGS="$CFLAGS -Wall -Wpointer-arith -Wwrite-strings -Wconversion -Wcast-qual -W -Wimplicit-fallthrough=0"
 ],[
-        CFLAGS="$CFLAGS -W"
+        CFLAGS="$CFLAGS -W -Wimplicit-fallthrough=0"
 ])
 
 dnl **********************************************************************************************
@@ -146,18 +146,18 @@ AC_ARG_ENABLE(target,
         if test "${enableval}" = "yes"; then
             AC_MSG_ERROR(missing argument for --enable-target parameter);
         elif test "${enableval}" = "x64Linux"; then
-            CFLAGS="$CFLAGS -Wno-invalid-offsetof -DTARGET_ARCH_x64Linux -DRTI_UNIX -DRTI_LINUX -DRTI_64BIT -DRTI_STATIC -m64"
+            CFLAGS="$CFLAGS -DTARGET_ARCH_x64Linux -DRTI_UNIX -DRTI_LINUX -DRTI_64BIT -DRTI_STATIC -m64"
             LDFLAGS="-m64 -static-libgcc -Wl,--no-as-needed"
             RTI_SYSLIBS="-ldl -lnsl -lm -lpthread -lrt"
             TARGET_ARCH="x64Linux4gcc7.3.0"
             dnl TARGET_ARCH="x64Linux3gcc4.8.2"
         elif test "${enableval}" = "i86Linux"; then
-            CFLAGS="$CFLAGS -Wno-invalid-offsetof -DTARGET_ARCH_i86Linux -DRTI_UNIX -DRTI_LINUX -DRTI_32BIT -DRTI_STATIC -m32"
+            CFLAGS="$CFLAGS -DTARGET_ARCH_i86Linux -DRTI_UNIX -DRTI_LINUX -DRTI_32BIT -DRTI_STATIC -m32"
             LDFLAGS="-m32 -static-libgcc"
             RTI_SYSLIBS="-ldl -lnsl -lm -lpthread -lrt"
             TARGET_ARCH="i86Linux3.xgcc4.6.3"
         elif test "${enableval}" = "rpi"; then
-            CFLAGS="$CFLAGS -Wno-invalid-offsetof -DFL_TARGET_armRaspbian -fpic -DRTI_UNIX -DRTI_LINUX -DRTI_STATIC -march=armv6 -mfpu=vfp -mfloat-abi=hard -mlong-calls"
+            CFLAGS="$CFLAGS -DTARGET_armRaspbian -fpic -DRTI_UNIX -DRTI_LINUX -DRTI_STATIC -march=armv6 -mfpu=vfp -mfloat-abi=hard -mlong-calls"
             RTI_SYSLIBS="-ldl -lnsl -lm -lpthread -lrt"
             TARGET_ARCH="armv6vfphLinux3.xgcc4.7.2"
         elif test "${enableval}" = "x64Darwin"; then
@@ -174,11 +174,11 @@ AC_ARG_ENABLE(target,
 ])
 
 
-CFLAGS="$CFLAGS -I${NDDSHOME}/include -I${NDDSHOME}/include/ndds -I{FBHOME}/include -I${FBHOME}/lib/monkey/include -I${FBHOME}/lib/mbedtls-2.16.3/include -I${FBHOME}/lib/jemalloc-5.2.1/include -I${FBHOME}/lib/msgpack-3.2.0/include -I${FBHOME}/lib/chunkio/include -I${FBHOME}/lib/flb_libco -I${FBHOME}/lib"
+CFLAGS="$CFLAGS -I${NDDSHOME}/include -I${NDDSHOME}/include/ndds -I${FBHOME}/include -I${FBHOME}/lib/monkey/include -I${FBHOME}/lib/mbedtls-2.16.3/include -I${FBHOME}/lib/jemalloc-5.2.1/include -I${FBHOME}/lib/msgpack-3.2.0/include -I${FBHOME}/lib/chunkio/include -I${FBHOME}/lib/flb_libco -I${FBHOME}/lib"
 LDFLAGS="$LDFLAGS -L${NDDSHOME}/lib/${TARGET_ARCH} -L${FBHOME}/build/lib"
 RTI_LIBS="-lnddsc${RTI_LIBSUFFIX} -lnddscore${RTI_LIBSUFFIX} ${RTI_SYSLIBS} -lfluent-bit"
 
 AC_SUBST(RTI_LIBS, "${RTI_LIBS}")
 
-AC_OUTPUT(Makefile src/out_dds_unstr/Makefile)
+AC_OUTPUT(Makefile src/out_dds_unstr/Makefile src/out_dds_str/Makefile)
 
