@@ -1,0 +1,3 @@
+Oct 01 00:16:03 ubuntu INFO OASManager [27304] Starting OAS Manager
+Oct 01 07:34:37 ubuntu ERROR AMOASScanner [27304] Skipping since file path /etc/cups/subscriptions.conf.N could not be opened due to - No such file or directory
+Oct 01 10:33:35 ubuntu ERROR AMOASScanner [27304] Infection caught File Name: /home/jason/Desktop/malware/G1_47cc260cf70fc81995f651dc1c5b172a.bin File Size: 29696 Infection Name: BackDoor-FBPA Time: 1569951214 Process Name: /usr/bin/scp User Name: root Profile Type: 1
