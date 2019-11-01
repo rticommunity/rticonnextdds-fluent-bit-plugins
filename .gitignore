@@ -21,3 +21,5 @@ missing
 *.o
 *.lo
 .*.swp
+session.vim
+tags
