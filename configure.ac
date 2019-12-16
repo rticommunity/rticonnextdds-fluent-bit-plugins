@@ -9,7 +9,7 @@ LT_INIT([dlopen])
 
 dnl subdir-objects tells Makefile to place object files in the same dir as sources.
 dnl See: https://www.gnu.org/software/automake/manual/html_node/List-of-Automake-options.html
-AM_INIT_AUTOMAKE([subdir-objects])
+AM_INIT_AUTOMAKE([subdir-objects tar-ustar foreign])
 
 AC_PROG_CC
 AM_PROG_CC_C_O
