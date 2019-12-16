@@ -1,0 +1,11 @@
+General:
+    - Remove unnecessary files from project (README/NEWS/COPYING...)
+    - Add license file
+
+
+Unstructured output plugin:
+    - Document configurable parameters
+    - Add parameter to load XML(s)
+    - Supply an example
+
+
