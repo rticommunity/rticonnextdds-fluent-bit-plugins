@@ -69,6 +69,11 @@ RTIBool FBCommon_parseArguments(struct flb_output_instance *ins,
         struct FBCommon_DDSConfig *ddsArgs);
 
 
+// Modifies the DDS_DomainParticipantFactory of the factory singleton to add the
+// given files to the list of files to load
+RTIBool FBCommon_setXMLFilesToFactoryQoS(const char **xmlFile, int xmlFileCount);
+
+
 // Returns RTI_TRUE if success, or RTI_FALSE in case of error
 RTIBool FBCommon_createDDSEntities(struct FBCommon_DDSConfig *ddsArgs,
         DDS_DomainParticipant **participant,

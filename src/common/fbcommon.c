@@ -66,6 +66,31 @@ RTIBool FBCommon_parseArguments(struct flb_output_instance *ins,
 }
 
 // }}}
+/* {{{ FBCommon_setXMLFilesToFactoryQoS
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ */
+RTIBool FBCommon_setXMLFilesToFactoryQoS(const char **xmlFile, int xmlFileCount) {
+    struct DDS_DomainParticipantFactoryQos factoryQos = DDS_DomainParticipantFactoryQos_INITIALIZER;
+    DDS_ReturnCode_t rc;
+
+    assert(xmlFile);
+
+    if ((rc = DDS_DomainParticipantFactory_get_qos(DDS_TheParticipantFactory, &factoryQos)) != DDS_RETCODE_OK) {
+        flb_error("Unable to get participant factory QoS: %d", rc);
+        return RTI_FALSE;
+    }
+    if (!DDS_StringSeq_from_array(&factoryQos.profile.url_profile, xmlFile, xmlFileCount)) {
+        flb_error("Failed to copy XML file list from array");
+        return RTI_FALSE;
+    }
+    if ((rc = DDS_DomainParticipantFactory_set_qos(DDS_TheParticipantFactory, &factoryQos)) != DDS_RETCODE_OK) {
+        flb_error("Unable to set participant factory QoS: %d", rc);
+        return RTI_FALSE;
+    }
+    return RTI_TRUE;
+}
+
+// }}}
 /* {{{ FBCommon_createDDSEntities
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
@@ -79,19 +104,7 @@ RTIBool FBCommon_createDDSEntities(struct FBCommon_DDSConfig *ddsArgs,
     assert(writer);
 
     if (ddsArgs->XMLFileCount > 0) {
-        // Add the given XML file to the list of files to automatically load
-        struct DDS_DomainParticipantFactoryQos factoryQos = DDS_DomainParticipantFactoryQos_INITIALIZER;
-
-        if ((rc = DDS_DomainParticipantFactory_get_qos(DDS_TheParticipantFactory, &factoryQos)) != DDS_RETCODE_OK) {
-            flb_error("Unable to get participant factory QoS: %d", rc);
-            return RTI_FALSE;
-        }
-        if (!DDS_StringSeq_from_array(&factoryQos.profile.url_profile, ddsArgs->XMLFile, ddsArgs->XMLFileCount)) {
-            flb_error("Failed to copy XML file list from array");
-            return RTI_FALSE;
-        }
-        if ((rc = DDS_DomainParticipantFactory_set_qos(DDS_TheParticipantFactory, &factoryQos)) != DDS_RETCODE_OK) {
-            flb_error("Unable to set participant factory QoS: %d", rc);
+        if (!FBCommon_setXMLFilesToFactoryQoS(ddsArgs->XMLFile, ddsArgs->XMLFileCount)) {
             return RTI_FALSE;
         }
     }

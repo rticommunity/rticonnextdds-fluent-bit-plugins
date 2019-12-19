@@ -70,6 +70,27 @@ static int dds_shutdown(DDS_DomainParticipant *participant) {
 }
 
 // }}}
+/* {{{ cb_dds_exit
+ * -------------------------------------------------------------------------
+ */
+static int cb_dds_exit(void *data, 
+        UNUSED_PARAM struct flb_config *config) {
+    struct flb_out_dds_unstr_config *ctx = data;
+    if (!ctx) {
+        return 0;
+    }
+
+    if (ctx->participant) {
+        dds_shutdown(ctx->participant);
+
+    }
+
+    flb_free(ctx);
+
+    return 0;
+}
+
+// }}}
 /* {{{ cb_dds_init
  * -------------------------------------------------------------------------
  */
@@ -79,14 +100,20 @@ static int cb_dds_init(struct flb_output_instance *ins,
     struct flb_out_dds_unstr_config *ctx;
     const char *tmp = NULL;
     DDS_ReturnCode_t retcode;
+    struct FBCommon_DDSConfig argDDSConfig;
 
     ctx = flb_calloc(1, sizeof(struct flb_out_dds_unstr_config));
-    if (!ctx) {
-        flb_errno();
-        return -1;
+    if (!OOM_CHECK(ctx)) {
+        goto err;
     }
 
-    // Setting Domain ID
+    // Read configuration parameters
+    FBCommon_DDSConfig_init(&argDDSConfig);
+    if (!FBCommon_parseArguments(ins, &argDDSConfig)) {
+        goto err;
+    }
+
+    // Get Domain ID
     tmp = flb_output_get_property("domain_id", ins);
     if (tmp != NULL && atoi(tmp) >= 0) {
         ctx->domain_id = atoi(tmp);
@@ -95,16 +122,18 @@ static int cb_dds_init(struct flb_output_instance *ins,
         ctx->domain_id = 0;
     }
 
-    /* To customize participant QoS, use
-       the configuration file USER_QOS_PROFILES.xml */
+    if (argDDSConfig.XMLFileCount > 0) {
+        if (!FBCommon_setXMLFilesToFactoryQoS(argDDSConfig.XMLFile, argDDSConfig.XMLFileCount)) {
+            goto err;
+        }
+    } 
     ctx->participant = DDS_DomainParticipantFactory_create_participant(
             DDS_TheParticipantFactory, ctx->domain_id, &DDS_PARTICIPANT_QOS_DEFAULT,
             NULL /* listener */, DDS_STATUS_MASK_NONE);
     if (ctx->participant == NULL) {
         flb_error("[%s] create_participant error\n", PLUGIN_NAME);
         dds_shutdown(ctx->participant);
-        flb_errno();
-        return -1;
+        goto err;
     }
 
     /* To customize publisher QoS, use
@@ -115,8 +144,7 @@ static int cb_dds_init(struct flb_output_instance *ins,
     if (ctx->publisher == NULL) {
         flb_error("[%s] create_publisher error\n", PLUGIN_NAME);
         dds_shutdown(ctx->participant);
-        flb_errno();
-        return -1;
+        goto err;
     }
 
     /* Register type before creating topic */
@@ -126,8 +154,7 @@ static int cb_dds_init(struct flb_output_instance *ins,
     if (retcode != DDS_RETCODE_OK) {
         flb_error("[%s] register_type error %d\n", PLUGIN_NAME, retcode);
         dds_shutdown(ctx->participant);
-        flb_errno();
-        return -1;
+        goto err;
     }
 
     /* To customize topic QoS, use
@@ -139,8 +166,7 @@ static int cb_dds_init(struct flb_output_instance *ins,
     if (ctx->topic == NULL) {
         flb_error(" [%s] create_topic error\n", PLUGIN_NAME);
         dds_shutdown(ctx->participant);
-        flb_errno();
-        return -1;
+        goto err;
     }
 
     /* To customize data writer QoS, use
@@ -151,16 +177,14 @@ static int cb_dds_init(struct flb_output_instance *ins,
     if (ctx->writer == NULL) {
         flb_error("[%s] create_datawriter error\n", PLUGIN_NAME);
         dds_shutdown(ctx->participant);
-        flb_errno();
-        return -1;
+        goto err;
     }
 
     ctx->fb_writer = FBDataWriter_narrow(ctx->writer);
     if (ctx->fb_writer == NULL) {
         flb_error("[%s] DataWriter narrow error\n", PLUGIN_NAME);
         dds_shutdown(ctx->participant);
-        flb_errno();
-        return -1;
+        goto err;
     }
 
     /* Create data sample for writing */
@@ -168,8 +192,7 @@ static int cb_dds_init(struct flb_output_instance *ins,
     if (ctx->instance == NULL) {
         flb_error("[%s] FBTypeSupport_create_data error\n", PLUGIN_NAME);
         dds_shutdown(ctx->participant);
-        flb_errno();
-        return -1;
+        goto err;
     }
 
     ctx->instance_handle = DDS_HANDLE_NIL;
@@ -186,6 +209,10 @@ static int cb_dds_init(struct flb_output_instance *ins,
     flb_output_set_context(ins, ctx);
     flb_info("[%s] domain_id=%d", PLUGIN_NAME, ctx->domain_id);
     return 0;
+
+err:
+    cb_dds_exit(ctx, NULL);
+    return -1;
 }
 
 // }}}
@@ -274,27 +301,6 @@ static void cb_dds_flush(const void *data,
 
     msgpack_unpacked_destroy(&result);
     FLB_OUTPUT_RETURN(FLB_OK);
-}
-
-// }}}
-/* {{{ cb_dds_exit
- * -------------------------------------------------------------------------
- */
-static int cb_dds_exit(void *data, 
-        UNUSED_PARAM struct flb_config *config) {
-    struct flb_out_dds_unstr_config *ctx = data;
-    if (!ctx) {
-        return 0;
-    }
-
-    if (ctx->participant) {
-        dds_shutdown(ctx->participant);
-
-    }
-
-    flb_free(ctx);
-
-    return 0;
 }
 
 // }}}
