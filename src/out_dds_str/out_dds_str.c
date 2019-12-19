@@ -9,6 +9,8 @@
  use the software.
  ******************************************************************************/
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <libgen.h>             // for basename()
 #include <limits.h>
 #include <wchar.h>
@@ -18,11 +20,37 @@
 #include <unistd.h>
 #include <string.h>
 
-#include "out_dds_str.h"
+#include "fbcommon.h"
+
+#include <fluent-bit/flb_info.h>
+#include <fluent-bit/flb_time.h>
+#include <fluent-bit/flb_pack.h>
+
 #include <cJSON.h> 
 
 #define PLUGIN_NAME         "out_dds_str"
-#define MAX_XML_FILE        10
+
+typedef enum PrecisionLossAction_t {
+    PrecisionLossAction_NONE,
+    PrecisionLossAction_WARN,
+    PrecisionLossAction_WARN_ONCE,
+    PrecisionLossAction_ABORT
+} PrecisionLossAction;
+
+#define DEFAULT_PRECISION_LOSS_ACTION   PrecisionLossAction_WARN
+
+struct flb_out_dds_str_config {
+    DDS_DomainParticipant *participant;
+    DDS_DynamicDataWriter *writer;
+    const DDS_TypeCode    * typeCode;
+    struct DDS_DynamicDataTypeSupport *typeSupport;
+    DDS_DynamicData *instance;
+    DDS_InstanceHandle_t instance_handle;
+
+    PrecisionLossAction     pcAction;       
+
+    struct cJSON * typeMap;
+};
 
 // Boolean to String:
 static const char * const BOOLEAN_STRING_TRUE   = "TRUE";
@@ -57,17 +85,6 @@ static const uint64_t MAX_UINT64_TO_OCTET = RTIXCdrOctet_MAX;  // +0xff
 static const int64_t  MAX_INT64_TO_OCTET  = RTIXCdrOctet_MAX;  // +0xff
 
 static const uint64_t MAX_UINT64_TO_LONGLONG  = RTIXCdrLongLong_MAX;
-
-// Stringification...
-// I.e.:
-//      #define FOO     5
-//      RTI_STR(FOO)   -> "FOO"
-//      RTI_XSTR(FOO)  -> "5"
-//
-#define RTI_XSTR(s)             RTI_STR(s)
-#define RTI_STR(s)              #s
-
-#define OOM_CHECK(ptr)      if (!(ptr)) do { flb_error("OUT OF MEMORY: " RTI_XSTR(ptr)); abort(); } while(0)
 
 
 /* {{{ dds_shutdown
@@ -165,8 +182,10 @@ char * readFile(const char *path) {
         return NULL;
     }
 
-    retVal = (char *)malloc(fs.st_size);
-    OOM_CHECK(retVal);
+    retVal = (char *)flb_malloc(fs.st_size);
+    if (!OOM_CHECK(retVal)) {
+        goto done;
+    }
 
     f = fopen(path, "r");
     if (!f) {
@@ -188,7 +207,7 @@ done:
         fclose(f);
     }
     if (!ok && retVal) {
-        free(retVal);
+        flb_free(retVal);
         retVal = NULL;
     }
     return retVal;
@@ -209,11 +228,13 @@ static inline void msgpack_object_initFromString(msgpack_object *me, const char 
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * Given a MSGPACK_OBJECT_STR builds a NULL-terminated copy of the string.
  * Returned pointer must be freed.
- * Call abort() in case of out of memory
+ * Returns NULL if out of memory
  */
 static inline char * msgpack_object_toString(const msgpack_object *me) {
-    char *retVal = calloc(1, me->via.str.size+1);
-    OOM_CHECK(retVal);
+    char *retVal = flb_calloc(1, me->via.str.size+1);
+    if (!OOM_CHECK(retVal)) {
+        return NULL;
+    }
     memcpy(retVal, me->via.str.ptr, me->via.str.size);
     return retVal;
 }
@@ -279,11 +300,13 @@ static inline DDS_Short transformValue_Short(struct flb_out_dds_str_config *ctx,
             } else {
                 char *ptr;
                 char *buf = msgpack_object_toString(value);
-                target = (DDS_Short)strtol(buf, &ptr, 0);
-                if (*ptr) {
-                    PRECISION_LOSS_WARNING(ctx, "string", "short", memberName);
-                } 
-                free(buf);
+                if (buf) {
+                    target = (DDS_Short)strtol(buf, &ptr, 0);
+                    if (*ptr) {
+                        PRECISION_LOSS_WARNING(ctx, "string", "short", memberName);
+                    } 
+                    flb_free(buf);
+                }
             }
             break;
 
@@ -330,11 +353,13 @@ static inline DDS_UnsignedShort transformValue_UnsignedShort(struct flb_out_dds_
             } else {
                 char *ptr;
                 char *buf = msgpack_object_toString(value);
-                target = (DDS_UnsignedShort)strtoul(buf, &ptr, 0);
-                if (*ptr) {
-                    PRECISION_LOSS_WARNING(ctx, "string", "ushort", memberName);
-                } 
-                free(buf);
+                if (buf) {
+                    target = (DDS_UnsignedShort)strtoul(buf, &ptr, 0);
+                    if (*ptr) {
+                        PRECISION_LOSS_WARNING(ctx, "string", "ushort", memberName);
+                    } 
+                    flb_free(buf);
+                }
             }
             break;
 
@@ -381,11 +406,13 @@ static inline DDS_Long transformValue_Long(struct flb_out_dds_str_config *ctx, c
             } else {
                 char *ptr;
                 char *buf = msgpack_object_toString(value);
-                target = (DDS_Long)strtol(buf, &ptr, 0);
-                if (*ptr) {
-                    PRECISION_LOSS_WARNING(ctx, "string", "long", memberName);
-                } 
-                free(buf);
+                if (buf) {
+                    target = (DDS_Long)strtol(buf, &ptr, 0);
+                    if (*ptr) {
+                        PRECISION_LOSS_WARNING(ctx, "string", "long", memberName);
+                    } 
+                    flb_free(buf);
+                }
             }
             break;
 
@@ -432,11 +459,13 @@ static inline DDS_UnsignedLong transformValue_UnsignedLong(struct flb_out_dds_st
             } else {
                 char *ptr;
                 char *buf = msgpack_object_toString(value);
-                target = (DDS_UnsignedLong)strtoul(buf, &ptr, 0);
-                if (*ptr) {
-                    PRECISION_LOSS_WARNING(ctx, "string", "ulong", memberName);
-                } 
-                free(buf);
+                if (buf) {
+                    target = (DDS_UnsignedLong)strtoul(buf, &ptr, 0);
+                    if (*ptr) {
+                        PRECISION_LOSS_WARNING(ctx, "string", "ulong", memberName);
+                    } 
+                    flb_free(buf);
+                }
             }
             break;
 
@@ -481,11 +510,13 @@ static inline DDS_Float transformValue_Float(struct flb_out_dds_str_config *ctx,
             {
                 char *ptr;
                 char *buf = msgpack_object_toString(value);
-                target = (DDS_Float)strtof(buf, &ptr);
-                if (*ptr) {
-                    PRECISION_LOSS_WARNING(ctx, "string", "float", memberName);
-                } 
-                free(buf);
+                if (buf) {
+                    target = (DDS_Float)strtof(buf, &ptr);
+                    if (*ptr) {
+                        PRECISION_LOSS_WARNING(ctx, "string", "float", memberName);
+                    } 
+                    flb_free(buf);
+                }
             }
             break;
 
@@ -530,11 +561,13 @@ static inline DDS_Double transformValue_Double(struct flb_out_dds_str_config *ct
             {
                 char *ptr;
                 char *buf = msgpack_object_toString(value);
-                target = (DDS_Double)strtof(buf, &ptr);
-                if (*ptr) {
-                    PRECISION_LOSS_WARNING(ctx, "string", "double", memberName);
-                } 
-                free(buf);
+                if (buf) {
+                    target = (DDS_Double)strtof(buf, &ptr);
+                    if (*ptr) {
+                        PRECISION_LOSS_WARNING(ctx, "string", "double", memberName);
+                    } 
+                    flb_free(buf);
+                }
             }
             break;
 
@@ -735,11 +768,13 @@ static inline DDS_Octet transformValue_Octet(struct flb_out_dds_str_config *ctx,
             } else {
                 char *ptr;
                 char *buf = msgpack_object_toString(value);
-                target = (DDS_Octet)strtoul(buf, &ptr, 0);
-                if (*ptr) {
-                    PRECISION_LOSS_WARNING(ctx, "string", "octet", memberName);
+                if (buf) {
+                    target = (DDS_Octet)strtoul(buf, &ptr, 0);
+                    if (*ptr) {
+                        PRECISION_LOSS_WARNING(ctx, "string", "octet", memberName);
+                    } 
+                    flb_free(buf);
                 } 
-                free(buf);
             }
             break;
 
@@ -753,7 +788,8 @@ static inline DDS_Octet transformValue_Octet(struct flb_out_dds_str_config *ctx,
 // }}}
 /* {{{ transformValue_String
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- * caller must free allocated string
+ * caller must flb_free allocated string
+ * Returns NULL in case of out of memory
  */
 static inline char * transformValue_String(struct flb_out_dds_str_config *ctx, const msgpack_object *value, const char *memberName) {
     char *target = NULL;
@@ -765,8 +801,10 @@ static inline char * transformValue_String(struct flb_out_dds_str_config *ctx, c
         case MSGPACK_OBJECT_POSITIVE_INTEGER:
             {   // C99: use snprintf to calculate the correct length
                 int len = snprintf(NULL, 0, "%lu", value->via.u64) + 1;
-                target = malloc(len);
-                OOM_CHECK(target);
+                target = flb_malloc(len);
+                if (!OOM_CHECK(target)) {
+                    return NULL;
+                }
                 snprintf(target, len, "%lu", value->via.u64);
                 break;
             }
@@ -774,8 +812,10 @@ static inline char * transformValue_String(struct flb_out_dds_str_config *ctx, c
         case MSGPACK_OBJECT_NEGATIVE_INTEGER:
             {   // C99: use snprintf to calculate the correct length
                 int len = snprintf(NULL, 0, "%ld", value->via.i64) + 1;
-                target = malloc(len);
-                OOM_CHECK(target);
+                target = flb_malloc(len);
+                if (!OOM_CHECK(target)) {
+                    return NULL;
+                }
                 snprintf(target, len, "%ld", value->via.i64);
                 break;
             }
@@ -783,15 +823,19 @@ static inline char * transformValue_String(struct flb_out_dds_str_config *ctx, c
         case MSGPACK_OBJECT_FLOAT64:
             {   // C99: use snprintf to calculate the correct length
                 int len = snprintf(NULL, 0, "%f", value->via.f64) + 1;
-                target = malloc(len);
-                OOM_CHECK(target);
+                target = flb_malloc(len);
+                if (!OOM_CHECK(target)) {
+                    return NULL;
+                }
                 snprintf(target, len, "%f", value->via.f64);
                 break;
             }
 
         case MSGPACK_OBJECT_STR: 
-            target = malloc(value->via.str.size+1);
-            OOM_CHECK(target);
+            target = flb_malloc(value->via.str.size+1);
+            if (!OOM_CHECK(target)) {
+                return NULL;
+            }
             memcpy(target, value->via.str.ptr, value->via.str.size);
             target[value->via.str.size] = '\0';
             break;
@@ -800,6 +844,9 @@ static inline char * transformValue_String(struct flb_out_dds_str_config *ctx, c
         default:    
             PRECISION_LOSS_WARNING(ctx, "non-primitive", "string", memberName);
             target = strdup("N/A");
+            if (!OOM_CHECK(target)) {
+                return NULL;
+            }
     }
     return target;
 }
@@ -808,6 +855,7 @@ static inline char * transformValue_String(struct flb_out_dds_str_config *ctx, c
 /* {{{ transformValue_Wstring
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * caller must free allocated buffer
+ * Returns NULL if out of memory occurred
  */
 static inline wchar_t * transformValue_Wstring(struct flb_out_dds_str_config *ctx, const msgpack_object *value, const char *memberName) {
     wchar_t *target = NULL;
@@ -819,8 +867,10 @@ static inline wchar_t * transformValue_Wstring(struct flb_out_dds_str_config *ct
         case MSGPACK_OBJECT_POSITIVE_INTEGER:
             {
                 int len = swprintf(NULL, 0, L"%lu", value->via.u64) + 1;
-                target = (wchar_t *)malloc(len);
-                OOM_CHECK(target);
+                target = (wchar_t *)flb_malloc(len);
+                if (!OOM_CHECK(target)) {
+                    return NULL;
+                }
                 swprintf(target, len, L"%lu", value->via.u64);
                 break;
             }
@@ -828,8 +878,10 @@ static inline wchar_t * transformValue_Wstring(struct flb_out_dds_str_config *ct
         case MSGPACK_OBJECT_NEGATIVE_INTEGER:
             {
                 int len = swprintf(NULL, 0, L"%ld", value->via.i64) + 1;
-                target = (wchar_t *)malloc(len);
-                OOM_CHECK(target);
+                target = (wchar_t *)flb_malloc(len);
+                if (!OOM_CHECK(target)) {
+                    return NULL;
+                }
                 swprintf(target, len, L"%ld", value->via.i64);
                 break;
             }
@@ -837,15 +889,19 @@ static inline wchar_t * transformValue_Wstring(struct flb_out_dds_str_config *ct
         case MSGPACK_OBJECT_FLOAT64:
             {
                 int len = swprintf(NULL, 0, L"%f", value->via.f64) + 1;
-                target = (wchar_t *)malloc(len);
-                OOM_CHECK(target);
+                target = (wchar_t *)flb_malloc(len);
+                if (!OOM_CHECK(target)) {
+                    return NULL;
+                }
                 swprintf(target, len, L"%f", value->via.f64);
                 break;
             }
 
         case MSGPACK_OBJECT_STR: 
-            target = calloc(value->via.str.size*2+1, sizeof(wchar_t));
-            OOM_CHECK(target);
+            target = flb_calloc(value->via.str.size*2+1, sizeof(wchar_t));
+            if (!OOM_CHECK(target)) {
+                return NULL;
+            }
             mbstowcs(target, value->via.str.ptr, value->via.str.size);
             break;
 
@@ -853,6 +909,9 @@ static inline wchar_t * transformValue_Wstring(struct flb_out_dds_str_config *ct
         default:    
             PRECISION_LOSS_WARNING(ctx, "non-primitive", "string", memberName);
             target = wcsdup(L"N/A");
+            if (!OOM_CHECK(target)) {
+                return NULL;
+            }
     }
     return target;
 }
@@ -890,11 +949,13 @@ static inline DDS_LongLong transformValue_LongLong(struct flb_out_dds_str_config
             } else {
                 char *ptr;
                 char *buf = msgpack_object_toString(value);
-                target = (DDS_LongLong)strtoll(buf, &ptr, 0);
-                if (*ptr) {
-                    PRECISION_LOSS_WARNING(ctx, "string", "longlong", memberName);
-                } 
-                free(buf);
+                if (buf) {
+                    target = (DDS_LongLong)strtoll(buf, &ptr, 0);
+                    if (*ptr) {
+                        PRECISION_LOSS_WARNING(ctx, "string", "longlong", memberName);
+                    } 
+                    flb_free(buf);
+                }
             }
             break;
 
@@ -938,11 +999,13 @@ static inline DDS_UnsignedLongLong transformValue_UnsignedLongLong(struct flb_ou
             } else {
                 char *ptr;
                 char *buf = msgpack_object_toString(value);
-                target = (DDS_UnsignedLongLong)strtoull(buf, &ptr, 0);
-                if (*ptr) {
-                    PRECISION_LOSS_WARNING(ctx, "string", "ulonglong", memberName);
-                } 
-                free(buf);
+                if (buf) {
+                    target = (DDS_UnsignedLongLong)strtoull(buf, &ptr, 0);
+                    if (*ptr) {
+                        PRECISION_LOSS_WARNING(ctx, "string", "ulonglong", memberName);
+                    } 
+                    flb_free(buf);
+                }
             }
             break;
 
@@ -984,11 +1047,13 @@ static inline long double transformValue_LongDouble(struct flb_out_dds_str_confi
             {
                 char *ptr;
                 char *buf = msgpack_object_toString(value);
-                target = strtold(buf, &ptr);
-                if (*ptr) {
-                    PRECISION_LOSS_WARNING(ctx, "string", "longdouble", memberName);
-                } 
-                free(buf);
+                if (buf) {
+                    target = strtold(buf, &ptr);
+                    if (*ptr) {
+                        PRECISION_LOSS_WARNING(ctx, "string", "longdouble", memberName);
+                    } 
+                    flb_free(buf);
+                }
             }
             break;
 
@@ -1100,22 +1165,26 @@ static DDS_Boolean setValueToMember(struct flb_out_dds_str_config *ctx, const ms
         case DDS_TK_STRING:
             {
                 char *ptr = transformValue_String(ctx, value, memberName); 
-                DDS_DynamicData_set_string(instance, 
-                        memberName, 
-                        DDS_DYNAMIC_DATA_MEMBER_ID_UNSPECIFIED, 
-                        ptr);
-                free(ptr);
+                if (ptr) {
+                    DDS_DynamicData_set_string(instance, 
+                            memberName, 
+                            DDS_DYNAMIC_DATA_MEMBER_ID_UNSPECIFIED, 
+                            ptr);
+                    flb_free(ptr);
+                }
                 break;
             }
 
         case DDS_TK_WSTRING:
             {
                 DDS_Wchar *ptr = (DDS_Wchar *)transformValue_Wstring(ctx, value, memberName); 
-                DDS_DynamicData_set_wstring(instance, 
-                        memberName, 
-                        DDS_DYNAMIC_DATA_MEMBER_ID_UNSPECIFIED, 
-                        ptr);
-                free(ptr);
+                if (ptr) {
+                    DDS_DynamicData_set_wstring(instance, 
+                            memberName, 
+                            DDS_DYNAMIC_DATA_MEMBER_ID_UNSPECIFIED, 
+                            ptr);
+                    flb_free(ptr);
+                }
                 break;
             }
 
@@ -1293,7 +1362,8 @@ static RTIBool mapObjectToType(const char *tag, struct flb_out_dds_str_config *c
 /* {{{ cb_dds_exit
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
-static int cb_dds_exit(void *data, struct flb_config *config) {
+static int cb_dds_exit(void *data, 
+        UNUSED_PARAM struct flb_config *config) {
     struct flb_out_dds_str_config *ctx = data;
     if (ctx) {
         if (ctx->participant) {
@@ -1309,17 +1379,11 @@ static int cb_dds_exit(void *data, struct flb_config *config) {
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 static int cb_dds_init(struct flb_output_instance *ins,
-		struct flb_config *config,
-		void *data) {
+		UNUSED_PARAM struct flb_config *config,
+		UNUSED_PARAM void *data) {
     struct flb_out_dds_str_config *ctx;
     const char *tmp = NULL;
-    const char *arg_DomainParticipant;
-    const char *arg_DataWriter;
-    DDS_ReturnCode_t rc;
-    const char *arg_XMLFile[MAX_XML_FILE];
-    int arg_XMLFileCount = 0;
-    int i;
-    char fileCountKey[20];
+    struct FBCommon_DDSConfig argDDSConfig;
 
     ctx = flb_calloc(1, sizeof(struct flb_out_dds_str_config));
     if (!ctx) {
@@ -1328,7 +1392,10 @@ static int cb_dds_init(struct flb_output_instance *ins,
     }
 
     // Read configuration parameters
-    memset(arg_XMLFile, 0, sizeof(arg_XMLFile));
+    FBCommon_DDSConfig_init(&argDDSConfig);
+    if (!FBCommon_parseArguments(ins, &argDDSConfig)) {
+        goto err;
+    }
 
     ctx->pcAction = DEFAULT_PRECISION_LOSS_ACTION;
     tmp = flb_output_get_property("PrecisionLossAction", ins);
@@ -1358,7 +1425,7 @@ static int cb_dds_init(struct flb_output_instance *ins,
             goto err;
         }
         ctx->typeMap = cJSON_Parse(ff);
-        free(ff);
+        flb_free(ff);
         if (!ctx->typeMap) {
             flb_error("Failed to parse type map JSON file");
             goto err;
@@ -1370,66 +1437,16 @@ static int cb_dds_init(struct flb_output_instance *ins,
             goto err;
         }
     }
-    
-    // Plain XMLFile only?
-    arg_XMLFile[0] = flb_output_get_property("XMLFile", ins);
-    if (arg_XMLFile[0]) {
-        arg_XMLFileCount = 1;
-    } else {
-        // Attempt to read the XMLFile_0, XML_File_1 ...
-        for (arg_XMLFileCount = 0; arg_XMLFileCount < MAX_XML_FILE; ++arg_XMLFileCount) {
-            snprintf(fileCountKey, sizeof(fileCountKey), "XMLFile_%d", arg_XMLFileCount);
-            arg_XMLFile[arg_XMLFileCount] = flb_output_get_property(fileCountKey, ins);
-            if (!arg_XMLFile[arg_XMLFileCount]) {
-                // Don't scan for all the keys, as soon as we don't find a key stop
-                break;
-            }
-        }
-        if (arg_XMLFileCount == MAX_XML_FILE) {
-            flb_warn("This plugin support only %d XMLFile_xx keys", MAX_XML_FILE);
-        }
-    }
 
-    arg_DomainParticipant = flb_output_get_property("DomainParticipant", ins);
-    if (!arg_DomainParticipant) {
-        flb_error("Missing required parameter 'DomainParticipant'");
-        goto err;
-    }
-
-    arg_DataWriter = flb_output_get_property("DataWriter", ins);
-    if (!arg_DataWriter) {
-        flb_error("Missing required parameter 'DataWriter'");
-        goto err;
-    }
-
-    if (arg_XMLFileCount > 0) {
-        // Add the given XML file to the list of files to automatically load
-        struct DDS_DomainParticipantFactoryQos factoryQos = DDS_DomainParticipantFactoryQos_INITIALIZER;
-
-        if ((rc = DDS_DomainParticipantFactory_get_qos(DDS_TheParticipantFactory, &factoryQos)) != DDS_RETCODE_OK) {
-            flb_error("Unable to get participant factory QoS: %d", rc);
+    // Create participant and data writer
+    {
+        RTIBool ok;
+        DDS_DataWriter *untypedWriter = NULL;
+        ok = FBCommon_createDDSEntities(&argDDSConfig, &ctx->participant, &untypedWriter);
+        if (!ok) {
             goto err;
         }
-        if (!DDS_StringSeq_from_array(&factoryQos.profile.url_profile, arg_XMLFile, arg_XMLFileCount)) {
-            flb_error("Failed to copy XML file list from array");
-            goto err;
-        }
-        if ((rc = DDS_DomainParticipantFactory_set_qos(DDS_TheParticipantFactory, &factoryQos)) != DDS_RETCODE_OK) {
-            flb_error("Unable to set participant factory QoS: %d", rc);
-            goto err;
-        }
-    }
-
-    ctx->participant = DDS_DomainParticipantFactory_create_participant_from_config(DDS_TheParticipantFactory, arg_DomainParticipant);
-    if (!ctx->participant) {
-        flb_error("Failed to create domain participant '%s'", arg_DomainParticipant);
-        goto err;
-    }
-    
-    ctx->writer = DDS_DynamicDataWriter_narrow(DDS_DomainParticipant_lookup_datawriter_by_name(ctx->participant, arg_DataWriter));
-    if (!ctx->writer) {
-        flb_error("Cannot find data writer '%s' in domain participant", arg_DataWriter);
-        goto err;
+        ctx->writer = DDS_DynamicDataWriter_narrow(untypedWriter);
     }
 
     ctx->typeCode = DDS_DomainParticipant_get_typecode(ctx->participant, "CIM_Malware_Attacks");
@@ -1452,7 +1469,7 @@ static int cb_dds_init(struct flb_output_instance *ins,
     ctx->instance_handle = DDS_HANDLE_NIL;
 
     flb_output_set_context(ins, ctx);
-    flb_info("[%s] Successfully created writer %s::%s", PLUGIN_NAME, arg_DomainParticipant, arg_DataWriter);
+    flb_info("[%s] Successfully created writer %s::%s", PLUGIN_NAME, argDDSConfig.domainParticipantName, argDDSConfig.dataWriterName);
     return 0;
 
 err:
@@ -1468,26 +1485,31 @@ static void cb_dds_flush(const void *data,
         size_t bytes,
         const char *tag, 
         int tag_len,
-        struct flb_input_instance *i_ins,
+        UNUSED_PARAM struct flb_input_instance *i_ins,
         void *out_context,
-        struct flb_config *config) {
+        UNUSED_PARAM struct flb_config *config) {
 
     struct flb_out_dds_str_config *ctx = (struct flb_out_dds_str_config *)out_context;
     size_t off = 0;
     msgpack_unpacked result;
     msgpack_object *obj;
-    msgpack_object key;
-    msgpack_object value;
     struct flb_time tms;            // Time of message
-    size_t i;
-    char keyStr[50];
     size_t count = 0;
     DDS_ReturnCode_t rc;
+    char *bufTag = NULL;
+
+    // A tag might not contain a NULL byte
+    bufTag = flb_malloc(tag_len + 1);
+    if (!OOM_CHECK(bufTag)) {
+        FLB_OUTPUT_RETURN(FLB_RETRY);
+    }
+    memcpy(bufTag, tag, tag_len);
+    bufTag[tag_len] = '\0';
 
     while(msgpack_unpack_next(&result, data, bytes, &off) == MSGPACK_UNPACK_SUCCESS) {
         flb_time_pop_from_msgpack(&tms, &result, &obj);
         
-        if (mapObjectToType(tag, ctx, obj)) {
+        if (mapObjectToType(bufTag, ctx, obj)) {
             rc = DDS_DynamicDataWriter_write(ctx->writer, ctx->instance, &DDS_HANDLE_NIL);
             if (rc != DDS_RETCODE_OK) {
                 flb_error("Failed to write DDS sample: %d", rc);
@@ -1495,69 +1517,9 @@ static void cb_dds_flush(const void *data,
                 ++count;
             }
         }
-
-#if 0
-        if (!strncmp(tag, "mcafee.found", tag_len)) {
-            /* Current mapping
-                 FluentBit          Attacks
-                 --------------------------------------------------
-                                -> action_enum = AttackAction_Blocked
-               ◇ time           ->
-               ◇ hostname       -> dest.host
-               ◇ severity       -> 
-               ◇ appName        -> vendor_product
-               ◇ pid            -> 
-               ◇ filepath       -> file_path, file_name
-               ◇ filesize       -> 
-               ◇ virusname      -> signature
-               ◇ scantime       -> date
-               ◇ processname    -> 
-               ◇ username       ->
-               ◇ profiletype    ->
-            */
-
-            for (i = 0; i < obj->via.map.size; i++) {
-                key = obj->via.map.ptr[i].key;
-                value = obj->via.map.ptr[i].val;
-
-                memset(keyStr, 0, sizeof(keyStr));
-                strncpy(keyStr, key.via.str.ptr, key.via.str.size);
-
-                if (!strcmp(keyStr, "hostname")) {
-                    setValueToMember(ctx, &value, "dest.host");
-                } else if (!strcmp(keyStr, "appName")) {
-                    setValueToMember(ctx, &value, "vendor_product");
-                } else if (!strcmp(keyStr, "filepath")) {
-                    // 'filepath' is used for both file_path and file_name
-                    char *base;
-                    char *path;                     // Need to make a copy of the value to invoke 'basename'...
-                    msgpack_object fileNameObj;     // ...and place it in a temp msgpack_object
-                    setValueToMember(ctx, &value, "file_path");
-
-                    path = msgpack_object_toString(&value);
-                    base = basename(path);
-                    msgpack_object_initFromString(&fileNameObj, base);
-                    setValueToMember(ctx, &fileNameObj, "file_name");
-                    free(path);
-
-                } else if (!strcmp(keyStr, "virusname")) {
-                    setValueToMember(ctx, &value, "signature");
-                } else if (!strcmp(keyStr, "scantime")) {
-                    setValueToMember(ctx, &value, "date.sec");
-                }
-            }
-            rc = DDS_DynamicDataWriter_write(ctx->writer, ctx->instance, &DDS_HANDLE_NIL);
-            if (rc != DDS_RETCODE_OK) {
-                flb_error("Failed to write DDS sample: %d", rc);
-            } else {
-                ++count;
-            }
-        } else {
-            flb_warn("Ignoring unhandled tag: %s", tag);
-        }
-#endif
     } // while there are messages to flush
 
+    flb_free(bufTag);
     msgpack_unpacked_destroy(&result);
     FLB_OUTPUT_RETURN(FLB_OK);
     flb_debug("Written %d DDS samples...", count);

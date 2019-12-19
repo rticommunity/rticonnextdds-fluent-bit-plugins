@@ -1,6 +1,7 @@
 General:
-    - Remove unnecessary files from project (README/NEWS/COPYING...)
     - Add license file
+    - Create a presentation with the architecture of the project to be used
+      in engineering & research meeting
 
 
 Unstructured output plugin:

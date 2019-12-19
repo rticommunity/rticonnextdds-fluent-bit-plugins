@@ -3,9 +3,20 @@
 A collection of dynamically loadable plugins for Fluent-Bit to interface with Connext DDS
 
 ---
+## Requirements
+
+You need to have a recent Linux distribution (Ubuntu 18.04, Linux Mint 19, ...) with installed C compiler, autotools are required if you are building from a checkout tree.
+
+You need [RTI Connext DDS Professional](https://www.rti.com/products/connext-dds-professional). 
+
+The `configure` script relies on the [rtipkg-config](https://github.com/fabriziobertocci/rtipkg-config) tool to determine the build flags for a given architecture. Make sure you have it installed on top of your RTI Connext DDS Professional installation.
+
+
+
 ## Building
+
 If you are building from a cloned git repository, you need to generate the configure script first.
-For this use the `bootstrap.sh` script
+For this use the `bootstrap.sh` script.
 
 After that just build like any other autoconf-based project. The `configure` 
 script requires the following arguments:
@@ -42,6 +53,7 @@ That will do it! You will end up with the dynamically loadable plugins under `$P
 (default to `/usr/local/lib`)
 
 
+
 ---
 ## Usage
 To use any of the defined plugin, you need to tell FluentBit to dynamically 
@@ -60,13 +72,33 @@ Now you can use the output plugin `dds_str` from the configuration:
     ...
 ```
 
+
+
+
+
+## Output DDS Unstructured Plugin
+
+This output plugin can publish data over DDS using a simple type that contain a sequence of key-value pairs holding the FluentBit event. The data type definitions are in the [IDL file](src/common/fb.idl).
+
+
+
+
+
 ------
 ## Output DDS Structured Plugin
+The structured output plugin publishes the FluentBit events using a user-defined type, using transformation rules that describe how to map the FluentBit properties into the user-provided data type:
+
+
+
+​			**<<TODO: Insert type mapping image here>>**
+
+
+
 The configuration parameters for the output DDS Structured Plugin are the following:
 
-   * **XMLFile_0**, **XMLFile_1**, ... **XMLFile_9** (optional): identify the
+   * **XMLFile || XMLFile_0**, **XMLFile_1**, ... **XMLFile_9** (optional): identify the
      XML files containing the published data type, topic and all the participant
-     definitions required by the plug-in for publishing. The plug-in will look
+     definitions required by the plug-in for publishing. You can specify either a single XML file (using the property XMFile, or multiple files, using XMLFile_x. The plug-in will look
      incrementally for all those properties and will stop loading the XML files
      once it finds an undefined property. For example, if you define XMLFile_0, 
      XMLFile_1, XMLFile_3, the plug-in will load only the files specified by
@@ -99,8 +131,6 @@ The configuration parameters for the output DDS Structured Plugin are the follow
 
    * **TypeMap** (required): defines the name of a JSON file containing the
      instructions on how to map fields of events from FluentBit into DDS type. 
-
-
 
 
 

@@ -1,9 +1,22 @@
+/*******************************************************************************
+ (c) 2005-2019 Copyright, Real-Time Innovations, Inc.  All rights reserved.
+ RTI grants Licensee a license to use, modify, compile, and create derivative
+ works of the Software.  Licensee has the right to distribute object form only
+ for use with RTI products.  The Software is provided "as is", with no warranty
+ of any type, including any warranty for fitness for any purpose. RTI is under
+ no obligation to maintain or support the Software.  RTI shall not be liable for
+ any incidental or consequential damages arising out of the use or inability to
+ use the software.
+ ******************************************************************************/
+
 #include "out_dds_unstr.h"
 
 #define PLUGIN_NAME         "out_dds_unstr"
 
-static int dds_shutdown(DDS_DomainParticipant *participant)
-{
+/* {{{ dds_shutdown
+ * -------------------------------------------------------------------------
+ */
+static int dds_shutdown(DDS_DomainParticipant *participant) {
     int status = 0;
     DDS_ReturnCode_t retcode;
 
@@ -34,10 +47,13 @@ static int dds_shutdown(DDS_DomainParticipant *participant)
     return status;
 }
 
+// }}}
+/* {{{ cb_dds_init
+ * -------------------------------------------------------------------------
+ */
 static int cb_dds_init(struct flb_output_instance *ins,
         UNUSED_PARAM struct flb_config *config,
-        UNUSED_PARAM void *data)
-{   
+        UNUSED_PARAM void *data) {
     struct flb_out_dds_unstr_config *ctx;
     const char *tmp = NULL;
     DDS_ReturnCode_t retcode;
@@ -150,13 +166,17 @@ static int cb_dds_init(struct flb_output_instance *ins,
     return 0;
 }
 
-static void cb_dds_flush(const void *data, size_t bytes,
+// }}}
+/* {{{ cb_dds_flush
+ * -------------------------------------------------------------------------
+ */
+static void cb_dds_flush(const void *data, 
+        size_t bytes,
         UNUSED_PARAM const char *tag, 
         UNUSED_PARAM int tag_len,
         UNUSED_PARAM struct flb_input_instance *i_ins,
         void *out_context,
         UNUSED_PARAM struct flb_config *config) {
-
     size_t i;
     size_t off = 0;
     struct flb_out_dds_unstr_config *ctx = out_context;
@@ -234,6 +254,10 @@ static void cb_dds_flush(const void *data, size_t bytes,
     FLB_OUTPUT_RETURN(FLB_OK);
 }
 
+// }}}
+/* {{{ cb_dds_exit
+ * -------------------------------------------------------------------------
+ */
 static int cb_dds_exit(void *data, 
         UNUSED_PARAM struct flb_config *config) {
     struct flb_out_dds_unstr_config *ctx = data;
@@ -251,6 +275,11 @@ static int cb_dds_exit(void *data,
     return 0;
 }
 
+// }}}
+/* {{{ out_dds_unstr_plugin
+ * -------------------------------------------------------------------------
+ * The only public exported symbol of the shared library
+ */
 struct flb_output_plugin out_dds_unstr_plugin = {
     .name         = "dds_unstr",
     .description  = "DDS Unstructured Output Plugin",
