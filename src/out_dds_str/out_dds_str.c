@@ -1513,6 +1513,7 @@ static void cb_dds_flush(const void *data,
     memcpy(bufTag, tag, tag_len);
     bufTag[tag_len] = '\0';
 
+    msgpack_unpacked_init(&result);
     while(msgpack_unpack_next(&result, data, bytes, &off) == MSGPACK_UNPACK_SUCCESS) {
         flb_time_pop_from_msgpack(&tms, &result, &obj);
         
