@@ -79,6 +79,16 @@ AC_CHECK_FILE("${NDDSHOME}/include/ndds/ndds_c.h",
         AC_MSG_ERROR(RTI Connext DDS not found or NDDSHOME not defined)
 ])
 
+dnl Verify the Connext DDS installation has the connext-config utility
+AC_CHECK_FILE("${NDDSHOME}/bin/connext-config", 
+[
+        AC_MSG_RESULT(Successfully validated connext-config )
+],[
+   AC_MSG_RESULT()
+   AC_MSG_RESULT(Cannot find connext-config utility installed on your RTI Connext DDS home directory)
+   AC_MSG_RESULT(For more info see: https://github.com/fabriziobertocci/connext-config)
+   AC_MSG_ERROR()
+])
 
 
 dnl **********************************************************************************************
