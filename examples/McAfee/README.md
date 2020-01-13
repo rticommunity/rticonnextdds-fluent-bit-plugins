@@ -26,11 +26,10 @@ the following entities:
 
    * `mcafee-malware.json`: the JSON field mapping file that describes how to map the fields extracted by the parser into the DDS type
 
-
 ---
 ## Data Model
 The data model used by this example is as follow (using a compact IDL syntax without
-commentsm or [XTypes](https://www.omg.org/spec/DDS-XTypes/1.1/About-DDS-XTypes/) annotations):
+comments or [XTypes](https://www.omg.org/spec/DDS-XTypes/1.1/About-DDS-XTypes/) annotations):
 
 ```
 module Common {
@@ -63,6 +62,21 @@ module Malware {
       Deferred
     };
 
+    enum ControlOperation {
+      @value(1)
+      StartScan,
+      @value(2)
+      StopScan,
+      @value(3)
+      ScanCompleted,
+      @value(4)
+      ClientConnected,
+      @value(5)
+      ClientDisconnected,
+      @value(6)
+      InstalledVirusDefinition
+    };
+    	
     struct Attacks {
       CIM::Malware::Action  action_enum;
       string<40>            category;
@@ -79,8 +93,22 @@ module Malware {
       string<Common::URL_STRING_MAX> url;
       string<Common::VENDOR_STRING_MAX> vendor_product;
     };
-```
+    
+    struct Operations {
+      CIM::Malware::ControlOperation op;
+      Common::HostIdentification dest;
+      string<30> dest_nt_domain;
+      string<50> product_version;
+      string<50> signature_version;
+      string<Common::VENDOR_STRING_MAX> vendor_product;
+    };
 
+    union Event switch(CIM::Malware::EventKind) {
+      case MalwareEvent_Attack:    CIM::Malware::Attacks attack;
+      case MalwareEvent_Operation: CIM::Malware::Operations operation;
+    };
+
+```
 
 
 
@@ -228,7 +256,6 @@ follow:
 | `username`         | `user`
 | N/A (static value) | `action_enum = 2` (Blocked)
 | N/A (static value) | `date.nanosecond = 0`
-
 
 
 
