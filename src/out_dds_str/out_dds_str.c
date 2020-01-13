@@ -795,7 +795,7 @@ static inline char * transformValue_String(struct flb_out_dds_str_config *ctx, c
     char *target = NULL;
     switch(value->type) {
         case MSGPACK_OBJECT_BOOLEAN:
-            target = strdup(value->via.boolean ? BOOLEAN_STRING_TRUE : BOOLEAN_STRING_FALSE);
+            target = flb_strdup(value->via.boolean ? BOOLEAN_STRING_TRUE : BOOLEAN_STRING_FALSE);
             break;
 
         case MSGPACK_OBJECT_POSITIVE_INTEGER:
@@ -843,7 +843,7 @@ static inline char * transformValue_String(struct flb_out_dds_str_config *ctx, c
         // MSGPACK_OBJECT_NIL, MSGPACK_OBJECT_EXT, MSGPACK_OBJECT_ARRAY, MSGPACK_OBJECT_MAP, MSGPACK_OBJECT_BIN
         default:    
             PRECISION_LOSS_WARNING(ctx, "non-primitive", "string", memberName);
-            target = strdup("N/A");
+            target = flb_strdup("N/A");
             if (!OOM_CHECK(target)) {
                 return NULL;
             }
@@ -1249,6 +1249,7 @@ static RTIBool mapObjectToType(const char *tag, struct flb_out_dds_str_config *c
     msgpack_object key;
     msgpack_object value;
     char keyStr[50];
+    DDS_ReturnCode_t rc;
 
     assert(tag);
     assert(ctx);
@@ -1285,6 +1286,12 @@ static RTIBool mapObjectToType(const char *tag, struct flb_out_dds_str_config *c
         staticNode = cJSON_GetObjectItem(topMap, "static");
         if (staticNode && (staticNode->type != cJSON_Object)) {
             flb_error("Wrong type for 'static' (%d) property for tag: '%s'", staticNode->type, tag);
+            return RTI_FALSE;
+        }
+
+        rc = DDS_DynamicData_clear_all_members(ctx->instance);
+        if (rc != DDS_RETCODE_OK) {
+            flb_error("Failed to clear all members for DDS instance: %d", rc);
             return RTI_FALSE;
         }
 
@@ -1449,7 +1456,7 @@ static int cb_dds_init(struct flb_output_instance *ins,
         ctx->writer = DDS_DynamicDataWriter_narrow(untypedWriter);
     }
 
-    ctx->typeCode = DDS_DomainParticipant_get_typecode(ctx->participant, "CIM_Malware_Attacks");
+    ctx->typeCode = DDS_DomainParticipant_get_typecode(ctx->participant, argDDSConfig.typeRegName); // "CIM_Malware_Event");
     if (!ctx->typeCode) {
         flb_error("Failed to get typecode");
         goto err;

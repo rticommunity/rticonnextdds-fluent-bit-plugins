@@ -62,6 +62,12 @@ RTIBool FBCommon_parseArguments(struct flb_output_instance *ins,
         return RTI_FALSE;
     }
 
+    ddsArgs->typeRegName = flb_output_get_property("RegisteredTypeName", ins);
+    if (!ddsArgs->typeRegName) {
+        flb_error("Missing required parameter 'RegisteredTypeName'");
+        return RTI_FALSE;
+    }
+
     return RTI_TRUE;
 }
 
@@ -97,7 +103,6 @@ RTIBool FBCommon_setXMLFilesToFactoryQoS(const char **xmlFile, int xmlFileCount)
 RTIBool FBCommon_createDDSEntities(struct FBCommon_DDSConfig *ddsArgs,
         DDS_DomainParticipant **participant,
         DDS_DataWriter **writer) {
-    DDS_ReturnCode_t rc;
 
     assert(ddsArgs);
     assert(participant);
