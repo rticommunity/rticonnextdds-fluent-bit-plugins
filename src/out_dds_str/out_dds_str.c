@@ -15,9 +15,6 @@
 #include <limits.h>
 #include <wchar.h>
 #include <math.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include <string.h>
 
 #include "fbcommon.h"
@@ -166,53 +163,6 @@ static DDS_TCKind getMemberKind(DDS_TypeCode *typeCode, const char * memberName)
 // }}}
 #endif
 
-/* {{{ readFile
- * -------------------------------------------------------------------------
- */
-char * readFile(const char *path) {
-    RTIBool ok = RTI_FALSE;
-    FILE *f = NULL;
-    struct stat fs;
-    char *retVal = NULL;
-
-    assert(path);
-
-    if (stat(path, &fs)) {
-        flb_warn("Failed to read type map file: %s", path);
-        return NULL;
-    }
-
-    retVal = (char *)flb_malloc(fs.st_size);
-    if (!OOM_CHECK(retVal)) {
-        goto done;
-    }
-
-    f = fopen(path, "r");
-    if (!f) {
-        // Hmm how come stat didn't fail?
-        flb_warn("Error opening type map file: %s (error=%s, errno=%d)", path, strerror(errno), errno);
-        goto done;
-    }
-
-    if (fread(retVal, 1, (size_t)fs.st_size, f) < (size_t)fs.st_size) {
-        flb_warn("Error reading type map file: %s (errno=%d)", strerror(errno), errno);
-        goto done;
-    }
-
-    retVal[fs.st_size] = '\0';
-    ok = RTI_TRUE;
-
-done:
-    if (f) {
-        fclose(f);
-    }
-    if (!ok && retVal) {
-        flb_free(retVal);
-        retVal = NULL;
-    }
-    return retVal;
-}
-/* }}} */
 
 /* {{{ msgpack_object_initFromString
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1426,7 +1376,7 @@ static int cb_dds_init(struct flb_output_instance *ins,
         flb_error("Missing type map file");
         goto err;
     } else {
-        char *ff = readFile(tmp);
+        char *ff = FBCommon_readFile(tmp, NULL);
         if (!ff) {
             flb_error("Unable to read provided type map file");
             goto err;

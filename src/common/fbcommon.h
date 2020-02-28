@@ -80,4 +80,23 @@ RTIBool FBCommon_createDDSEntities(struct FBCommon_DDSConfig *ddsArgs,
         DDS_DomainParticipant **participant,
         DDS_DataWriter **writer);
 
+
+/**
+ * \brief Reads an entire file from disk
+ *
+ * Reads a file from disk and returns a buffer with its content. For easy of use
+ * the buffer is allocated of (fileSize + 1) and is NULL terminated (making it
+ * easy to deal with text files).
+ *
+ * Caller must free the returned buffer.
+ *
+ * \param path      The NULL-terminated string of the full path of the file
+ * \param sizeOut   An optional pointer to a size_t variable that will be used
+ *                  to return the file size.
+ * \return      a buffer dynamically allocated with the content of the entire file
+ *              or NULL if an error occurred
+ */
+char * FBCommon_readFile(const char *path, size_t *sizeOut);
+
+
 #endif          // !defined(__FLB_COMMON_H_INCLUDED__)
