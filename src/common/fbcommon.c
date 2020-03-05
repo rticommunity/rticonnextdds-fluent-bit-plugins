@@ -11,6 +11,9 @@
 
 #include "fbcommon.h"
 #include <assert.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 /* {{{ FBCommon_DDSConfig_init
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -62,6 +65,12 @@ RTIBool FBCommon_parseArguments(struct flb_output_instance *ins,
         return RTI_FALSE;
     }
 
+    ddsArgs->typeRegName = flb_output_get_property("RegisteredTypeName", ins);
+    if (!ddsArgs->typeRegName) {
+        flb_error("Missing required parameter 'RegisteredTypeName'");
+        return RTI_FALSE;
+    }
+
     return RTI_TRUE;
 }
 
@@ -97,7 +106,6 @@ RTIBool FBCommon_setXMLFilesToFactoryQoS(const char **xmlFile, int xmlFileCount)
 RTIBool FBCommon_createDDSEntities(struct FBCommon_DDSConfig *ddsArgs,
         DDS_DomainParticipant **participant,
         DDS_DataWriter **writer) {
-    DDS_ReturnCode_t rc;
 
     assert(ddsArgs);
     assert(participant);
@@ -126,4 +134,54 @@ RTIBool FBCommon_createDDSEntities(struct FBCommon_DDSConfig *ddsArgs,
 }
 
 // }}}
+/* {{{ FBCommon_readFile
+ * -------------------------------------------------------------------------
+ */
+char * FBCommon_readFile(const char *path, size_t *sizeOut) {
+    RTIBool ok = RTI_FALSE;
+    FILE *f = NULL;
+    struct stat fs;
+    char *retVal = NULL;
+
+    assert(path);
+
+    if (stat(path, &fs)) {
+        flb_warn("Failed to read type map file: %s", path);
+        return NULL;
+    }
+
+    retVal = (char *)flb_calloc(fs.st_size + 1, 1);
+    if (!OOM_CHECK(retVal)) {
+        goto done;
+    }
+
+    f = fopen(path, "r");
+    if (!f) {
+        // Hmm how come stat didn't fail?
+        flb_warn("Error opening type map file: %s (error=%s, errno=%d)", path, strerror(errno), errno);
+        goto done;
+    }
+
+    if (fread(retVal, 1, (size_t)fs.st_size, f) < (size_t)fs.st_size) {
+        flb_warn("Error reading type map file: %s (errno=%d)", strerror(errno), errno);
+        goto done;
+    }
+
+    if (sizeOut) {
+        *sizeOut = fs.st_size;
+    }
+
+    ok = RTI_TRUE;
+
+done:
+    if (f) {
+        fclose(f);
+    }
+    if (!ok && retVal) {
+        flb_free(retVal);
+        retVal = NULL;
+    }
+    return retVal;
+}
+/* }}} */
 

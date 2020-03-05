@@ -79,6 +79,16 @@ AC_CHECK_FILE("${NDDSHOME}/include/ndds/ndds_c.h",
         AC_MSG_ERROR(RTI Connext DDS not found or NDDSHOME not defined)
 ])
 
+dnl Verify the Connext DDS installation has the connext-config utility
+AC_CHECK_FILE("${NDDSHOME}/bin/connext-config", 
+[
+        AC_MSG_RESULT(Successfully validated connext-config )
+],[
+   AC_MSG_RESULT()
+   AC_MSG_RESULT(Cannot find connext-config utility installed on your RTI Connext DDS home directory)
+   AC_MSG_RESULT(For more info see: https://github.com/fabriziobertocci/connext-config)
+   AC_MSG_ERROR()
+])
 
 
 dnl **********************************************************************************************
@@ -86,21 +96,23 @@ dnl * Target kind
 dnl **********************************************************************************************
 AC_ARG_ENABLE(target,
 [  --enable-target=ARG     specify the target architecture (required)
-                          Use 'rtipkg-config --list-all' to view the supported targets ],
+                          Use 'connext-config --list-all' to view the supported targets ],
 [
         if test "${enableval}" = "yes"; then
             AC_MSG_ERROR(missing argument for --enable-target parameter);
         else
-            if test -z `rtipkg-config --list-all | grep ${enableval}`; then
+            if test -z `connext-config --list-all | grep ${enableval}`; then
                 AC_MSG_ERROR(invalid or unsupported target type);
             fi
             if test $? -ne 0; then
-                AC_MSG_ERROR(error invoking rtipkg-config, check log for details)
+                AC_MSG_ERROR(error invoking connext-config, check log for details)
             fi
-            CC="`rtipkg-config --ccomp ${enableval}`"
-            LD="`rtipkg-config --clink ${enableval}`"
-            CFLAGS="$CFLAGS `rtipkg-config $RTICFG_STATIC $RTICFG_DEBUG --cflags ${enableval}`"
-            LDFLAGS="`rtipkg-config $RTICFG_STATIC $RTICFG_DEBUG --ldflags ${enableval}`"
+            AC_MSG_RESULT(Using connext-config to get compiler and linker settings...)
+            CC="`connext-config --ccomp ${enableval}`"
+            LD="`connext-config --clink ${enableval}`"
+            CFLAGS="$CFLAGS `connext-config $RTICFG_STATIC $RTICFG_DEBUG --cflags ${enableval}`"
+            LDFLAGS="`connext-config $RTICFG_STATIC $RTICFG_DEBUG --ldflags ${enableval}`"
+            LDFLAGS="$LDFLAGS `connext-config $RTICFG_STATIC $RTICFG_DEBUG --ldlibs ${enableval}`"
         fi
         AC_MSG_RESULT(Building for target ${enableval} system)
 ],[

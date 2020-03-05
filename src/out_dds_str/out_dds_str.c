@@ -15,9 +15,6 @@
 #include <limits.h>
 #include <wchar.h>
 #include <math.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include <string.h>
 
 #include "fbcommon.h"
@@ -166,53 +163,6 @@ static DDS_TCKind getMemberKind(DDS_TypeCode *typeCode, const char * memberName)
 // }}}
 #endif
 
-/* {{{ readFile
- * -------------------------------------------------------------------------
- */
-char * readFile(const char *path) {
-    RTIBool ok = RTI_FALSE;
-    FILE *f = NULL;
-    struct stat fs;
-    char *retVal = NULL;
-
-    assert(path);
-
-    if (stat(path, &fs)) {
-        flb_warn("Failed to read type map file: %s", path);
-        return NULL;
-    }
-
-    retVal = (char *)flb_malloc(fs.st_size);
-    if (!OOM_CHECK(retVal)) {
-        goto done;
-    }
-
-    f = fopen(path, "r");
-    if (!f) {
-        // Hmm how come stat didn't fail?
-        flb_warn("Error opening type map file: %s (error=%s, errno=%d)", path, strerror(errno), errno);
-        goto done;
-    }
-
-    if (fread(retVal, 1, (size_t)fs.st_size, f) < (size_t)fs.st_size) {
-        flb_warn("Error reading type map file: %s (errno=%d)", strerror(errno), errno);
-        goto done;
-    }
-
-    retVal[fs.st_size] = '\0';
-    ok = RTI_TRUE;
-
-done:
-    if (f) {
-        fclose(f);
-    }
-    if (!ok && retVal) {
-        flb_free(retVal);
-        retVal = NULL;
-    }
-    return retVal;
-}
-/* }}} */
 
 /* {{{ msgpack_object_initFromString
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -267,6 +217,8 @@ static inline void PRECISION_LOSS_WARNING(struct flb_out_dds_str_config *ctx, co
 // }}}
 /* {{{ transformValue_Short
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * Transform a FluentBit value into a DDS Short
+ * Call PRECISION_LOSS_WARNING if the value cannot be fully represented in a short
  */
 static inline DDS_Short transformValue_Short(struct flb_out_dds_str_config *ctx, const msgpack_object *value, const char *memberName) {
     DDS_Short target = 0;
@@ -795,7 +747,7 @@ static inline char * transformValue_String(struct flb_out_dds_str_config *ctx, c
     char *target = NULL;
     switch(value->type) {
         case MSGPACK_OBJECT_BOOLEAN:
-            target = strdup(value->via.boolean ? BOOLEAN_STRING_TRUE : BOOLEAN_STRING_FALSE);
+            target = flb_strdup(value->via.boolean ? BOOLEAN_STRING_TRUE : BOOLEAN_STRING_FALSE);
             break;
 
         case MSGPACK_OBJECT_POSITIVE_INTEGER:
@@ -843,7 +795,7 @@ static inline char * transformValue_String(struct flb_out_dds_str_config *ctx, c
         // MSGPACK_OBJECT_NIL, MSGPACK_OBJECT_EXT, MSGPACK_OBJECT_ARRAY, MSGPACK_OBJECT_MAP, MSGPACK_OBJECT_BIN
         default:    
             PRECISION_LOSS_WARNING(ctx, "non-primitive", "string", memberName);
-            target = strdup("N/A");
+            target = flb_strdup("N/A");
             if (!OOM_CHECK(target)) {
                 return NULL;
             }
@@ -1203,6 +1155,7 @@ static DDS_Boolean setValueToMember(struct flb_out_dds_str_config *ctx, const ms
             break;
 
         case DDS_TK_LONGDOUBLE: 
+            /*
             {
                 DDS_LongDouble ddsVal;
                 long double val = transformValue_LongDouble(ctx, value, memberName); 
@@ -1216,6 +1169,9 @@ static DDS_Boolean setValueToMember(struct flb_out_dds_str_config *ctx, const ms
                         ddsVal);
                 break;
             }
+            */
+            flb_error("Error: unsupported LONG DOUBLE for member: '%s'", memberName);
+            return DDS_BOOLEAN_FALSE;
 
         case DDS_TK_STRUCT:
         case DDS_TK_UNION:
@@ -1249,6 +1205,7 @@ static RTIBool mapObjectToType(const char *tag, struct flb_out_dds_str_config *c
     msgpack_object key;
     msgpack_object value;
     char keyStr[50];
+    DDS_ReturnCode_t rc;
 
     assert(tag);
     assert(ctx);
@@ -1285,6 +1242,12 @@ static RTIBool mapObjectToType(const char *tag, struct flb_out_dds_str_config *c
         staticNode = cJSON_GetObjectItem(topMap, "static");
         if (staticNode && (staticNode->type != cJSON_Object)) {
             flb_error("Wrong type for 'static' (%d) property for tag: '%s'", staticNode->type, tag);
+            return RTI_FALSE;
+        }
+
+        rc = DDS_DynamicData_clear_all_members(ctx->instance);
+        if (rc != DDS_RETCODE_OK) {
+            flb_error("Failed to clear all members for DDS instance: %d", rc);
             return RTI_FALSE;
         }
 
@@ -1419,7 +1382,7 @@ static int cb_dds_init(struct flb_output_instance *ins,
         flb_error("Missing type map file");
         goto err;
     } else {
-        char *ff = readFile(tmp);
+        char *ff = FBCommon_readFile(tmp, NULL);
         if (!ff) {
             flb_error("Unable to read provided type map file");
             goto err;
@@ -1449,7 +1412,7 @@ static int cb_dds_init(struct flb_output_instance *ins,
         ctx->writer = DDS_DynamicDataWriter_narrow(untypedWriter);
     }
 
-    ctx->typeCode = DDS_DomainParticipant_get_typecode(ctx->participant, "CIM_Malware_Attacks");
+    ctx->typeCode = DDS_DomainParticipant_get_typecode(ctx->participant, argDDSConfig.typeRegName); // "CIM_Malware_Event");
     if (!ctx->typeCode) {
         flb_error("Failed to get typecode");
         goto err;
@@ -1506,6 +1469,7 @@ static void cb_dds_flush(const void *data,
     memcpy(bufTag, tag, tag_len);
     bufTag[tag_len] = '\0';
 
+    msgpack_unpacked_init(&result);
     while(msgpack_unpack_next(&result, data, bytes, &off) == MSGPACK_UNPACK_SUCCESS) {
         flb_time_pop_from_msgpack(&tms, &result, &obj);
         
