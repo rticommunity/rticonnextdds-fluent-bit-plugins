@@ -5,11 +5,11 @@ A collection of dynamically loadable plugins for Fluent-Bit to interface with Co
 ---
 ## Requirements
 
-You need to have a recent Linux distribution (Ubuntu 18.04, Linux Mint 19, ...) with installed C compiler, autotools are required if you are building from a checkout tree.
+* You need to have a recent Linux distribution (Ubuntu 18.04, Linux Mint 19, ...) with installed C compiler, autotools are required if you are building from a checkout tree.
 
-You need [RTI Connext DDS Professional](https://www.rti.com/products/connext-dds-professional). 
+* You need [RTI Connext DDS Professional](https://www.rti.com/products/connext-dds-professional). 
 
-The `configure` script relies on the [rtipkg-config](https://github.com/fabriziobertocci/rtipkg-config) tool to determine the build flags for a given architecture. Make sure you have it installed on top of your RTI Connext DDS Professional installation.
+* The `configure` script relies on the [rtipkg-config](https://github.com/fabriziobertocci/rtipkg-config) tool to determine the build flags for a given architecture. Make sure you have it installed on top of your RTI Connext DDS Professional installation.
 
 
 
@@ -72,25 +72,110 @@ Now you can use the output plugin `dds_str` from the configuration:
     ...
 ```
 
+Note that FluentBit uses the file name as foundation to load and dynamically build
+the plugin. Do not rename the plugin files.
+
+
+
+---
+## Plugins
+This project contains the following plugins:
+* Output DDS Unstructured
+* Output DDS Structured
+
+The next section contains information on the configuration parameters for each plugin
 
 
 
 
-## Output DDS Unstructured Plugin
+### Output DDS Unstructured Plugin
 
 This output plugin can publish data over DDS using a simple type that contain a sequence of key-value pairs holding the FluentBit event. The data type definitions are in the [IDL file](src/common/fb.idl).
 
+In the unstructured plugin FluentBit events are published over DDS using a simple mapping where all the fields are stored in sequence of properties. The top-level type is defined as:
+
+```idl
+struct FB {
+    double ts;
+    string<MAX_TAG_LEN> tag;//@key
+    sequence<Record, MAX_RECORDS> records;
+};
+```
+
+The `tag` property contains the tag associated with the given event and represent the key of the message being published.
+
+The `Record` structure is a simple key-value pair:
+
+```idl
+struct Record {
+    string<MAX_KEY_LEN> key;
+    Value value;
+};
+```
+
+Where the `Value` object is defined one of the native fluent bit types:
+
+```idl
+union Value switch (ValueKind) {
+        case BOOLEAN:
+                boolean b;
+        case POSITIVE_INTEGER:
+                unsigned long long u64;
+        case NEGATIVE_INTEGER:
+                long long i64;
+        case FLOAT32:
+                float f32;
+        case FLOAT64:
+                double f64;
+        case STR:
+                string<MAX_STR_LEN> str;
+};
+```
+
+
+
+Complex FluentBit types (array, maps) are not supported.
+
+
+
+ 
+
+### Output DDS Structured Plugin
+The structured output plugin publishes the FluentBit events using a user-defined type, by performing a data transformation described through rules that can be defined in the configuartion file.
+
+Those transformation rules tells the plugin how to map the FluentBit properties into the user-provided data type:
+
+<p align="center">From FluentBit Type <b>BOOLEAN</b>:</p>
+
+| DDS Type                                                     | Value                                              |
+| ------------------------------------------------------------ | -------------------------------------------------- |
+| `boolean`                                                    | false=DDS_BOOLEAN_FALSE><br/>true=DDS_BOOLEAN_TRUE |
+| `short (int16)`<br />`unsigned short (uint16)`<br />`long (int32)`<br />`unsigned long (uint32)`<br />`long long (int64)`<br />`unsigned long long (uint64)` | false=0<br/>true=1                                 |
+| `float (float32)`<br />`double (float64)`                    | false=0.0<br/>true=1.0                             |
+| `char (char8)`<br />`wchar (char16)`                         | false='0'<br/>true='1'                             |
+| `string`<br />`wstring`                                      | false="FALSE"<br/>true="TRUE"                      |
+| `long double (float128)`                                     | *unsupported*                                      |
 
 
 
 
-------
-## Output DDS Structured Plugin
-The structured output plugin publishes the FluentBit events using a user-defined type, using transformation rules that describe how to map the FluentBit properties into the user-provided data type:
+
+<p align="center">From FluentBit Type <b>POSITIVE_INTEGER (unsigned int)</b>:</p>
+
+| DDS Type                                                     | Value                      |
+| ------------------------------------------------------------ | -------------------------- |
+| `boolean`                                                    |                            |
+| `short (int16)`<br />`unsigned short (uint16)`<br />`long (int32)`<br />`unsigned long (uint32)`<br />`long long (int64)`<br />`unsigned long long (uint64)` | false=0, true=1            |
+| `float (float32)`<br />`double (float64)`                    | false=0.0, true=1.0        |
+| `char (char8)`<br />`wchar (char16)`                         | false='0', true='1'        |
+| `string`<br />`wstring`                                      | false="FALSE", true="TRUE" |
+| `long double (float128)`                                     | *unsupported*              |
 
 
 
-​			**<<TODO: Insert type mapping image here>>**
+
+
+
 
 
 
