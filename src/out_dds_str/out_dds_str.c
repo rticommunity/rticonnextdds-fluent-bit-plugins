@@ -217,6 +217,8 @@ static inline void PRECISION_LOSS_WARNING(struct flb_out_dds_str_config *ctx, co
 // }}}
 /* {{{ transformValue_Short
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * Transform a FluentBit value into a DDS Short
+ * Call PRECISION_LOSS_WARNING if the value cannot be fully represented in a short
  */
 static inline DDS_Short transformValue_Short(struct flb_out_dds_str_config *ctx, const msgpack_object *value, const char *memberName) {
     DDS_Short target = 0;
@@ -1153,6 +1155,7 @@ static DDS_Boolean setValueToMember(struct flb_out_dds_str_config *ctx, const ms
             break;
 
         case DDS_TK_LONGDOUBLE: 
+            /*
             {
                 DDS_LongDouble ddsVal;
                 long double val = transformValue_LongDouble(ctx, value, memberName); 
@@ -1166,6 +1169,9 @@ static DDS_Boolean setValueToMember(struct flb_out_dds_str_config *ctx, const ms
                         ddsVal);
                 break;
             }
+            */
+            flb_error("Error: unsupported LONG DOUBLE for member: '%s'", memberName);
+            return DDS_BOOLEAN_FALSE;
 
         case DDS_TK_STRUCT:
         case DDS_TK_UNION:
