@@ -1,16 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <dds xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://community.rti.com/schema/6.0.0/rti_dds_profiles.xsd" version="6.0.0">
-    <domain_library name="MalwareDomainLibrary">
-      <domain name="MalwareDomain" domain_id="0">
-        <register_type name="CIM_Malware_Attacks" type_ref="CIM::Malware::Attacks"/>
-        <topic name="MalwareAttacks" register_type_ref="CIM_Malware_Attacks"/>
+    <types>
+    </types>
+
+    <domain_library name="AVDomainLibrary">
+      <domain name="AVDomain" domain_id="0">
+        <register_type name="CIM_Malware_Event" type_ref="CIM::Malware::Event"/>
+        <topic name="AVEvent" register_type_ref="CIM_Malware_Event"/>
       </domain>
     </domain_library>
 
-    <domain_participant_library name="MalwareParticipantLibrary">
-      <domain_participant name="MalwareParticipant" domain_ref="MalwareDomainLibrary::MalwareDomain">
-        <publisher name="MalwarePublisher">
-          <data_writer name="MalwareWriter" topic_ref="MalwareAttacks"/>
+    <domain_participant_library name="AVParticipantLibrary">
+      <domain_participant name="AVParticipant" domain_ref="AVDomainLibrary::AVDomain">
+        <publisher name="AVPublisher">
+          <data_writer name="AVEventWriter" topic_ref="AVEvent"/>
         </publisher>
       </domain_participant>
     </domain_participant_library>
