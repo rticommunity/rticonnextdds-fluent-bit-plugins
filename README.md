@@ -11,9 +11,9 @@ A collection of dynamically loadable plugins for Fluent-Bit to interface with Co
 
 * The `configure` script relies on the [connext-config](https://github.com/fabriziobertocci/connext-config) tool to determine the build flags for a given architecture. Make sure you have it installed on top of your RTI Connext DDS Professional installation.
 
+<br/><br/>
 
-
-
+----------------
 
 ## Building
 
@@ -56,7 +56,10 @@ That will do it! You will end up with the dynamically loadable plugins under `$P
 
 
 
----
+<br/><br/>
+
+-------------
+
 ## Usage
 To use any of the defined plugin, you need to tell FluentBit to dynamically 
 load and initialize them using the -e command-line option:
@@ -77,7 +80,7 @@ Now you can use the output plugin `dds_str` from the configuration:
 Note that FluentBit uses the file name as foundation to load and dynamically build
 the plugin. Do not rename the plugin files.
 
-
+<br/><br/>
 
 ---
 ## Plugins
@@ -87,7 +90,7 @@ This project contains the following plugins:
 
 The next section contains information on the configuration parameters for each plugin
 
-
+<br/>
 
 
 ### Output DDS Unstructured Plugin
@@ -138,9 +141,7 @@ union Value switch (ValueKind) {
 
 Complex FluentBit types (array, maps) are not supported.
 
-
-
- 
+<br/><br/>
 
 ### Output DDS Structured Plugin
 The structured output plugin publishes the FluentBit events using a user-defined type, by performing a data transformation described through rules that can be defined in the configuartion file.
@@ -149,14 +150,14 @@ Those transformation rules tells the plugin how to map the FluentBit properties 
 
 <p align="center">From FluentBit Type <b>BOOLEAN</b>:</p>
 
-| DDS Type                                                     | Value                                              |
-| ------------------------------------------------------------ | -------------------------------------------------- |
-| `boolean`                                                    | false=DDS_BOOLEAN_FALSE><br/>true=DDS_BOOLEAN_TRUE |
-| `short (int16)`<br />`unsigned short (uint16)`<br />`long (int32)`<br />`unsigned long (uint32)`<br />`long long (int64)`<br />`unsigned long long (uint64)` | false=0<br/>true=1                                 |
-| `float (float32)`<br />`double (float64)`                    | false=0.0<br/>true=1.0                             |
-| `char (char8)`<br />`wchar (char16)`                         | false='0'<br/>true='1'                             |
-| `string`<br />`wstring`                                      | false="FALSE"<br/>true="TRUE"                      |
-| `long double (float128)`                                     | *unsupported, plugin reports an error*             |
+| DDS Type                                                     | Value                                             |
+| ------------------------------------------------------------ | ------------------------------------------------- |
+| `boolean`                                                    | false=DDS_BOOLEAN_FALSE<br/>true=DDS_BOOLEAN_TRUE |
+| `short (int16)`<br />`unsigned short (uint16)`<br />`long (int32)`<br />`unsigned long (uint32)`<br />`long long (int64)`<br />`unsigned long long (uint64)` | false=0<br/>true=1                                |
+| `float (float32)`<br />`double (float64)`                    | false=0.0<br/>true=1.0                            |
+| `char (char8)`<br />`wchar (char16)`                         | false='0'<br/>true='1'                            |
+| `string`<br />`wstring`                                      | false="FALSE"<br/>true="TRUE"                     |
+| `long double (float128)`                                     | *unsupported, plugin reports an error*            |
 
 
 
@@ -206,7 +207,7 @@ When the converting FluentBit and DDS types that are not compatible, the plugin 
 
 User can control what to do when a precision loss condition is triggered through the plugin setting **PrecisionLoss**.
 
-
+<br/>
 
 **Configuration Parameters**
 
@@ -223,6 +224,7 @@ The configuration parameters for the output DDS Structured Plugin are the follow
        * `abort`: call abort() to terminate immediately the application if this condition is detected. It is recommended to use this condition only for debugging and troubleshooting.
    * **TypeMap** (required): defines the name of a JSON file containing the instructions on how to map fields of events from FluentBit into DDS type. 
 
+<br/>
 
 **Type Map File**
 
@@ -256,7 +258,7 @@ For an example of a map file, refer to the [McAfee AV example](examples/McAfee/R
 
 
 
-
+<br/><br/>
 
 ------
 ## Notes
