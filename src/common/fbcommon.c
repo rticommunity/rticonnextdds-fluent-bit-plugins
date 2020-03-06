@@ -65,12 +65,6 @@ RTIBool FBCommon_parseArguments(struct flb_output_instance *ins,
         return RTI_FALSE;
     }
 
-    ddsArgs->typeRegName = flb_output_get_property("RegisteredTypeName", ins);
-    if (!ddsArgs->typeRegName) {
-        flb_error("Missing required parameter 'RegisteredTypeName'");
-        return RTI_FALSE;
-    }
-
     return RTI_TRUE;
 }
 

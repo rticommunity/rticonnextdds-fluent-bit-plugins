@@ -60,7 +60,6 @@ struct FBCommon_DDSConfig {
     const char *dataWriterName;
     const char *XMLFile[MAX_XML_FILE];
     int XMLFileCount;
-    const char *typeRegName;
 };
 
 void FBCommon_DDSConfig_init(struct FBCommon_DDSConfig *me);

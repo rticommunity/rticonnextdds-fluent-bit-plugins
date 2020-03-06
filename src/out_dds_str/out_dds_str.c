@@ -505,7 +505,6 @@ static inline DDS_Double transformValue_Double(struct flb_out_dds_str_config *ct
             break;
 
         case MSGPACK_OBJECT_FLOAT64:
-            PRECISION_LOSS_WARNING(ctx, "double", "double", memberName);
             target = (DDS_Double)value->via.f64;
             break;
 
@@ -774,12 +773,13 @@ static inline char * transformValue_String(struct flb_out_dds_str_config *ctx, c
 
         case MSGPACK_OBJECT_FLOAT64:
             {   // C99: use snprintf to calculate the correct length
-                int len = snprintf(NULL, 0, "%f", value->via.f64) + 1;
+                int len = snprintf(NULL, 0, "%lg", value->via.f64) + 1;
                 target = flb_malloc(len);
                 if (!OOM_CHECK(target)) {
                     return NULL;
                 }
                 snprintf(target, len, "%f", value->via.f64);
+                PRECISION_LOSS_WARNING(ctx, "float", "string", memberName);
                 break;
             }
 
@@ -1347,6 +1347,8 @@ static int cb_dds_init(struct flb_output_instance *ins,
     struct flb_out_dds_str_config *ctx;
     const char *tmp = NULL;
     struct FBCommon_DDSConfig argDDSConfig;
+    RTIBool ok;
+    DDS_DataWriter *untypedWriter = NULL;
 
     ctx = flb_calloc(1, sizeof(struct flb_out_dds_str_config));
     if (!ctx) {
@@ -1402,20 +1404,40 @@ static int cb_dds_init(struct flb_output_instance *ins,
     }
 
     // Create participant and data writer
-    {
-        RTIBool ok;
-        DDS_DataWriter *untypedWriter = NULL;
-        ok = FBCommon_createDDSEntities(&argDDSConfig, &ctx->participant, &untypedWriter);
-        if (!ok) {
+    ok = FBCommon_createDDSEntities(&argDDSConfig, &ctx->participant, &untypedWriter);
+    if (!ok) {
+        goto err;
+    }
+    ctx->writer = DDS_DynamicDataWriter_narrow(untypedWriter);
+
+    { 
+        DDS_Topic * topic;
+        DDS_TopicDescription *topicDescr;
+        const char *typeName;
+
+        topic = DDS_DataWriter_get_topic(untypedWriter);
+        if (!topic) {
+            flb_error("Failed to get topic");
             goto err;
         }
-        ctx->writer = DDS_DynamicDataWriter_narrow(untypedWriter);
-    }
+        topicDescr =  DDS_Topic_as_topicdescription(topic);
+        if (!topicDescr) {
+            flb_error("Failed to get topic description");
+            goto err;
+        }
 
-    ctx->typeCode = DDS_DomainParticipant_get_typecode(ctx->participant, argDDSConfig.typeRegName); // "CIM_Malware_Event");
-    if (!ctx->typeCode) {
-        flb_error("Failed to get typecode");
-        goto err;
+        typeName = DDS_TopicDescription_get_type_name(topicDescr);
+        if (!typeName) {
+            flb_error("Failed to get type name");
+            goto err;
+        }
+        flb_info("[%s] Using registered type name: %s", PLUGIN_NAME, typeName);
+
+        ctx->typeCode = DDS_DomainParticipant_get_typecode(ctx->participant, typeName); // "CIM_Malware_Event");
+        if (!ctx->typeCode) {
+            flb_error("Failed to get typecode");
+            goto err;
+        }
     }
     ctx->typeSupport = DDS_DynamicDataTypeSupport_new(ctx->typeCode, &DDS_DYNAMIC_DATA_TYPE_PROPERTY_DEFAULT);
     if (!ctx->typeSupport) {
