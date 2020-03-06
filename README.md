@@ -9,7 +9,9 @@ A collection of dynamically loadable plugins for Fluent-Bit to interface with Co
 
 * You need [RTI Connext DDS Professional](https://www.rti.com/products/connext-dds-professional). 
 
-* The `configure` script relies on the [rtipkg-config](https://github.com/fabriziobertocci/rtipkg-config) tool to determine the build flags for a given architecture. Make sure you have it installed on top of your RTI Connext DDS Professional installation.
+* The `configure` script relies on the [connext-config](https://github.com/fabriziobertocci/connext-config) tool to determine the build flags for a given architecture. Make sure you have it installed on top of your RTI Connext DDS Professional installation.
+
+
 
 
 
@@ -216,16 +218,41 @@ The configuration parameters for the output DDS Structured Plugin are the follow
    * **DataWriter** (required): defines the `PublisherName::DataWriterName` of the data writer to use for publication.
    * **PrecisionLoss** (optional): defines the action the plug-in will perform when it detects a loss of precision when mapping FluentBit events into the structured data type. For example, if attempting to map a long 32-bit integer into a 16-bit integer, depending on the value, you might get a data corruption. Possible values are:
        * `none` (default): don't do anything.
-       * `warn`: print a warning on the console every time this condition is
-         detected.
-       * `warn_once`: print a warning on the console the first time this condition
-         is detected (but don't keep printing it if a similar situation is 
-         encountered).
-       * `abort`: call abort() to terminate immediately the application if
-         this condition is detected. It is recommended to use this condition 
-         only for debugging and troubleshooting.
-   * **TypeMap** (required): defines the name of a JSON file containing the
-     instructions on how to map fields of events from FluentBit into DDS type. 
+       * `warn`: print a warning on the console **every time** this condition is detected.
+       * `warn_once`: print a warning on the console **only the first** time this condition is detected (but don't keep printing it if a similar situation is encountered).
+       * `abort`: call abort() to terminate immediately the application if this condition is detected. It is recommended to use this condition only for debugging and troubleshooting.
+   * **TypeMap** (required): defines the name of a JSON file containing the instructions on how to map fields of events from FluentBit into DDS type. 
+
+
+**Type Map File**
+
+The TypeMap file tells the plugin how to map all the properties of the events (in FluentBit) into DDS samples. The file is encoded using JSON where the top-level element is an array containing the individual mapping:
+
+```javascript
+[ EventMap, EventMap, ...]
+```
+
+Each `EventMap` is an object that tells how to identify the event in FluentBit (by tag comparison) and how to generate the DDS data. The structure of the `EventMap` object is as follow:
+
+```javascript
+{
+    "tag": String,            // Required
+    "map": FieldMapObject,    // Optional
+    "static": StaticMapObject // Optional
+}
+```
+
+* The value of the `tag` property defines the tag of the event for which this map applies.
+* The `map` property defines a dynamic map that explain how to translate FluentBit field into DDS members of struct:
+  * property name = name of the fluent bit field
+  * property value = fully qualified name of the DDS member (for nested structures, use the '.' separator)
+* The `static` properties defines an object that statically assign the value of the members of the DDS struct:
+  * property name = fully qualified name of the DDS member
+  * property value = static value to assign
+
+Note that only the defined DDS members will be assigned: all the other non-specified members will have their default value (whether defined through the IDL or by the system).
+
+For an example of a map file, refer to the [McAfee AV example](examples/McAfee/README.md).
 
 
 
@@ -234,11 +261,8 @@ The configuration parameters for the output DDS Structured Plugin are the follow
 ------
 ## Notes
 
-  * The name of the plugin you specify with the `-e` command-line option is
-    important as it determines the name of the plugin, and the entry point of the
-    plugin. The installed `/usr/local/lib/flb-out_dds_str.so` is a symlink
-    to the real loadable plugin that is `/usr/local/lib/libflb_out_dds_str.so`.
-
-  * Refer to the examples (inside the `examples` folder) to see how to use the
+  * The name of the plugin you specify with the `-e` command-line option is important as it determines the name of the plugin, and the entry point of the plugin. The installed `/usr/local/lib/flb-out_dds_str.so` is a symlink to the real loadable plugin that is `/usr/local/lib/libflb_out_dds_str.so`.
+    
+  * Refer to the [McAfee AV example](examples/McAfee/README.md) (inside the `examples` folder) to see how to use the
     plugin
 
