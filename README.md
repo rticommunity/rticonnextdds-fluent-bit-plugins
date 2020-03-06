@@ -154,56 +154,67 @@ Those transformation rules tells the plugin how to map the FluentBit properties 
 | `float (float32)`<br />`double (float64)`                    | false=0.0<br/>true=1.0                             |
 | `char (char8)`<br />`wchar (char16)`                         | false='0'<br/>true='1'                             |
 | `string`<br />`wstring`                                      | false="FALSE"<br/>true="TRUE"                      |
-| `long double (float128)`                                     | *unsupported*                                      |
+| `long double (float128)`                                     | *unsupported, plugin reports an error*             |
 
 
 
+<p align="center">From FluentBit Type <b>POSITIVE_INTEGER (unsigned int)</b> and <b>NEGATIVE_INTEGER (signed int)</b>:</p>
 
-
-<p align="center">From FluentBit Type <b>POSITIVE_INTEGER (unsigned int)</b>:</p>
-
-| DDS Type                                                     | Value                      |
-| ------------------------------------------------------------ | -------------------------- |
-| `boolean`                                                    |                            |
-| `short (int16)`<br />`unsigned short (uint16)`<br />`long (int32)`<br />`unsigned long (uint32)`<br />`long long (int64)`<br />`unsigned long long (uint64)` | false=0, true=1            |
-| `float (float32)`<br />`double (float64)`                    | false=0.0, true=1.0        |
-| `char (char8)`<br />`wchar (char16)`                         | false='0', true='1'        |
-| `string`<br />`wstring`                                      | false="FALSE", true="TRUE" |
-| `long double (float128)`                                     | *unsupported*              |
-
+| DDS Type                                                     | Value                                                        |
+| :----------------------------------------------------------- | ------------------------------------------------------------ |
+| `boolean`                                                    | 0 = DDS_BOOLEAN_FALSE<br/>non-zero = DDS_BOOLEAN_TRUE        |
+| `short (int16)`<br />`unsigned short (uint16)`<br />`long (int32)`<br />`unsigned long (uint32)`<br />`long long (int64)`<br />`unsigned long long (uint64)` | DDS Value is the same as the FluentBit.<br/>Plugin will trigger a precision loss condition <br/>if the number cannot be assigned/converted without <br/>a loss of information. |
+| `float (float32)`<br />`double (float64)`                    | DDS Value is the same as the FluentBit.<br/>Plugin will trigger a precision loss condition <br/>if the number cannot be assigned/converted without <br/>a loss of information. |
+| `char (char8)`<br />`wchar (char16)`                         | Only the numbers: [0..9] are transformed in a single<br/>UTF8 character '0', '1', ... '9'. Any other number will trigger <br/>a precision loss condition. |
+| `string`<br />`wstring`                                      | The UTF-8 representation of the number.                      |
+| `long double (float128)`                                     | *unsupported*, plugin reports an error                       |
 
 
 
+<p align="center">From FluentBit Type <b>FLOAT64 (double)</b>:</p>
+
+| DDS Type                                                     | Value                                                        |
+| :----------------------------------------------------------- | ------------------------------------------------------------ |
+| `boolean`                                                    | +/- 0.0 = DDS_BOOLEAN_FALSE<br/>any other value = DDS_BOOLEAN_TRUE |
+| `short (int16)`<br />`unsigned short (uint16)`<br />`long (int32)`<br />`unsigned long (uint32)`<br />`long long (int64)`<br />`unsigned long long (uint64)` | The assigned DDS value is the integer portion<br/>of the FluentBit number.<br/>A precision loss condition is <b>always</b> triggered for<br/>all the values converted from double to (any) integer. |
+| `float (float32)`                                            | The DDS value is the casted value of the FluentBit number<br/>(value is rounded to single precision). A precision loss<br/>condition is <b>always</b> triggered. |
+| `double (float64)`                                           | Same as FluentBit value                                      |
+| `char (char8)`<br />`wchar (char16)`                         | *unsupported*, value published is always `'\0'`<br/>A precision loss condition is <b>always triggered</b>. |
+| `string`<br />`wstring`                                      | The UTF-8 representation of the number converted using<br/>sprintf and the conversion "%lg".<br/>A precision loss condition is <b>always triggered</b>. |
+| `long double (float128)`                                     | *unsupported*, plugin reports an error                       |
 
 
 
+<p align="center">From FluentBit Type <b>STR (string)</b>:</p>
 
+| DDS Type                                                     | Value                                                        |
+| :----------------------------------------------------------- | ------------------------------------------------------------ |
+| `boolean`                                                    | The following strings are accepted for TRUE:<br/>"TRUE", "1".<br/>The following strings are accepted for FALSE:<br/>"FALSE", "0"<br/>String comparison is **not** case sensitive ("*True*" is accepted). |
+| `short (int16)`<br />`unsigned short (uint16)`<br />`long (int32)`<br />`unsigned long (uint32)`<br />`long long (int64)`<br />`unsigned long long (uint64)` | The assigned DDS value is the result of the <br/>ASCII to integer conversion of the FluentBit number.<br/>A precision loss condition is triggered if the converted<br/>value cannot be represented with in the given DDS type. |
+| `float (float32)`<br/>`double (float64)`                     | The DDS value is converted from the FluentBit number<br/>using `strtof()` / `strtod()`. A precision loss is<br/>triggered if an invalid character is detected when parsing. |
+| `char (char8)`<br />`wchar (char16)`                         | The first character of the string is used as DDS value.<br/>A precision loss condition is <b>triggered</b> if the FluentBit<br/>string is longer than 1 character. <br/>Empty strings are converted to character `'\0'`. |
+| `string`<br />`wstring`                                      | The FluentBit string value *as is*.                          |
+| `long double (float128)`                                     | *unsupported*, plugin reports an error                       |
+
+
+
+Complex FluentBit types (array, maps) are not supported.
+
+When the converting FluentBit and DDS types that are not compatible, the plugin may trigger a precision loss condition. For example, if the DDS type is a short and the FluentBit value is 100,000, the condition is triggered (because 100,000 cannot be represented in a 16-bit integer).
+
+User can control what to do when a precision loss condition is triggered through the plugin setting **PrecisionLoss**.
+
+
+
+**Configuration Parameters**
 
 The configuration parameters for the output DDS Structured Plugin are the following:
 
-   * **XMLFile || XMLFile_0**, **XMLFile_1**, ... **XMLFile_9** (optional): identify the
-     XML files containing the published data type, topic and all the participant
-     definitions required by the plug-in for publishing. You can specify either a single XML file (using the property XMFile, or multiple files, using XMLFile_x. The plug-in will look
-     incrementally for all those properties and will stop loading the XML files
-     once it finds an undefined property. For example, if you define XMLFile_0, 
-     XMLFile_1, XMLFile_3, the plug-in will load only the files specified by
-     XMLFile_0 and XMLFile_1.
-     If no XML are specified, the plug-in will follow the XML location rules
-     as defined in the RTI Connext User's manual (for example, it will look
-     at the environment variable `$USER_QOS_PROFILE`, will look for the file 
-     `USER_QOS_PROFILES.xml`).
-
-   * **DomainParticipant** (required): defines the fully qualified name in the 
-     form: `DomainParticipantLibrary::DomainParticipantName` to use.
-
-   * **DataWriter** (required): defines the `PublisherName::DataWriterName` of
-     the data writer to use for publication.
-
-   * **PrecisionLoss** (optional): defines the action the plug-in will perform
-     when it detects a loss of precision when mapping FluentBit events into
-     the structured data type. For example, if attempting to map a long 32-bit
-     integer into a 16-bit integer, depending on the value, you might get a
-     data corruption. Possible values are:
+   * **XMLFile || XMLFile_0**, **XMLFile_1**, ... **XMLFile_9** (optional): identify the XML files containing the published data type, topic and all the participant definitions required by the plug-in for publishing. You can specify either a single XML file (using the property **XMLFile**, or multiple files, using **XMLFile*_x***. The plug-in will look incrementally for all those properties and will stop loading the XML files once it finds an undefined property. For example, if you define XMLFile_0, XMLFile_1, XMLFile_3, the plug-in will load only the files specified by XMLFile_0 and XMLFile_1.
+     If no XML are specified, the plug-in will follow the standard XML location rules as defined in the RTI Connext User's manual (for example, it will look at the environment variable `$USER_QOS_PROFILE`, the file `USER_QOS_PROFILES.xml`, ...).
+   * **DomainParticipant** (required): defines the fully qualified name in the form: `DomainParticipantLibrary::DomainParticipantName` to use. The domain participant must be defined in one of the `<participant_library>` defined in any XML. 
+   * **DataWriter** (required): defines the `PublisherName::DataWriterName` of the data writer to use for publication.
+   * **PrecisionLoss** (optional): defines the action the plug-in will perform when it detects a loss of precision when mapping FluentBit events into the structured data type. For example, if attempting to map a long 32-bit integer into a 16-bit integer, depending on the value, you might get a data corruption. Possible values are:
        * `none` (default): don't do anything.
        * `warn`: print a warning on the console every time this condition is
          detected.
@@ -213,7 +224,6 @@ The configuration parameters for the output DDS Structured Plugin are the follow
        * `abort`: call abort() to terminate immediately the application if
          this condition is detected. It is recommended to use this condition 
          only for debugging and troubleshooting.
-
    * **TypeMap** (required): defines the name of a JSON file containing the
      instructions on how to map fields of events from FluentBit into DDS type. 
 
