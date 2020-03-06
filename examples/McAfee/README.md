@@ -1,6 +1,5 @@
 # McAfee Demo
-This demo shows how to use the FluentBit Structured DDS plug-in
-to publish scan results from McAfee over DDS using
+This demo shows how to use the FluentBit Structured DDS plug-in to publish scan results from McAfee over DDS using
 a data model that is designed to insert data into [Splunk CIM for Malware](https://docs.splunk.com/Documentation/CIM/4.14.0/User/Malware).
 
 ---
