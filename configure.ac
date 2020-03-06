@@ -60,7 +60,7 @@ AC_ARG_WITH(connextdds,
         if test "${withval}" = "yes"; then
             AC_MSG_ERROR(missing argument for --with-connextdds parameter);
         else
-            NDDSHOME="${withval}"
+            NDDSHOME=`realpath "${withval}"`
         fi
 ],[
         AC_MSG_RESULT(Checking for NDDSHOME...)
@@ -128,7 +128,7 @@ AC_ARG_WITH(fluentbit,
         if test "${withval}" = "yes"; then
             AC_MSG_ERROR(missing argument for --with-fluentbit parameter);
         else
-            FBHOME="${withval}"
+            FBHOME=`realpath "${withval}"`
         fi
 ],[
         AC_MSG_ERROR(Missing required argument --with-fluentbit);
