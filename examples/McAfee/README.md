@@ -1,6 +1,5 @@
 # McAfee Demo
-This demo shows how to use the FluentBit Structured DDS plug-in to publish scan results from McAfee over DDS using
-a data model that is designed to insert data into [Splunk CIM for Malware](https://docs.splunk.com/Documentation/CIM/4.14.0/User/Malware).
+This demo shows how to use the FluentBit Structured DDS plug-in to publish scan results from McAfee over DDS using a data model that is designed to insert data into [Splunk CIM for Malware](https://docs.splunk.com/Documentation/CIM/4.14.0/User/Malware).
 
 ---
 ## Files in this example:
@@ -27,8 +26,7 @@ the following entities:
 
 ---
 ## Data Model
-The data model used by this example is as follow (using a compact IDL syntax without
-comments or [XTypes](https://www.omg.org/spec/DDS-XTypes/1.1/About-DDS-XTypes/) annotations):
+The data model used by this example is as follow (using a compact IDL syntax without comments or [XTypes](https://www.omg.org/spec/DDS-XTypes/1.1/About-DDS-XTypes/) annotations):
 
 ```
 module Common {
@@ -160,7 +158,7 @@ the same events. Each input produces two kind of events:
      through the Tail configuration parameter `Key`).
 
 ### The filter block
-The configuration file also defines a **Grep Filter** with the following rule:
+The configuration file also defines a **grep filter** with the following rule:
 
 ```
 [FILTER]
@@ -207,7 +205,8 @@ following section of the `mcafee.conf` file:
 
     # dds_str configuration 
     # XMLFile is optional, if not provided will use the default user's qos search path
-    # You can use either XMLFile or if you need to load multiple files, use XMLFile_xx where xx is 0-9.
+    # You can use either XMLFile or if you need to load multiple files, 
+    # use XMLFile_xx where xx is 0-9.
     # Numbers must be contiguous
     XMLFile_0   McafeePublisher.xml
     XMLFile_1   SplunkMalware.xml
@@ -223,104 +222,106 @@ following section of the `mcafee.conf` file:
     TypeMap ./mcafee-malware.json
 ```
 
-| Property | Description
-| -------- | --------------------------
-| Name     | Identify the name of the output plug-in. This name must match the name of the `.so` containing the code.
-| Match    | Matching rule, in this case we want to send all the events with  tag starting with `mcafee.`.
-| XMLFile_x| Tells the plug-in to load the given XML file. Up to 10 files can be specified through the `XMLFile_x` property. Index starts from 0.
-| DomainParticipant | Fully qualified name of the domain participant to use. The name must be in the format: `LibraryName::ParticipantName`
-| DataWriter | Fully qualified name of the data writer to use. The name must be in the format: `PublisherName::DataWriterName`
-| PrecisionLoss | Tells the plug-in what to do in case of loss of precision when converting FluentBit data into DDS sample. See plugin description for details.
-| TypeMap | Defines the JSON file that maps FluentBit fields into DDS type
 
-The TypeMap file `mcafee-malware.json` describes how to map the fields of all the events
-processed by this output plug-in into members of the data type used by the specified
-data writer. 
+
+| Property              | Description                                                  |
+| --------------------- | ------------------------------------------------------------ |
+| `Name`                | Identify the name of the output plug-in. This name must be exactly `dds_str` as it must match the name of the `.so` containing the plugin. |
+| `Match`               | Matching rule, in this case we want to send all the events with  tag starting with `mcafee`. |
+| `XMLFile_0`           | Tells the plug-in to load the file `McafeePublisher.xml` containing the domain and participant library definitions. |
+| `XML_File_1`          | Tells the plug-in to load the file `SplunkMalware.xml` containing the DDS Types definitions. |
+| `DomainParticipant`   | The name of the fully qualified participant as defined in `McafeePublisher.xml` (in this case: `MalwareParticipantLibrary::MalwareParticipant`). |
+| `DataWriter`          | The name of the fully qualified data writer as defined in `McafeePublisher.xml` (in this case: `MalwarePublisher::MalwareWriter`). |
+| `PrecisionLossAction` | What to do in case of precision loss is to produce a warning message in the FluentBit log every time a loss is detected. |
+| `TypeMap`             | Defines the file `./mcafee-malware.json` map file            |
+
+
+
+The TypeMap file `mcafee-malware.json` describes how to map the fields of all the events processed by this output plug-in into members of the data type used by the specified data writer. 
 
 In our case the XML configuration `McafeePublisher.xml` defines the data writer 
-`MalwarePublsher::MalwareWriter` to publish on topic `MalwareAttacks` of type `CIM::Malware::Attacks` (see the 
-IDL definition at the beginning of this document). 
+`MalwarePublsher::MalwareWriter` to publish on topic `MalwareAttacks` of type `CIM::Malware::Attacks` (see the IDL definition at the beginning of this document). 
 
 The current mapping file contains a single table for events with tag: `mcafee.found` and operates as 
 follow:
 
-| FluentBit property | CIM::Malware:Attacks member
-| ------------------ | -----------------------------------------
-| `hostname`         | `dest.host`
-| `appName`          | `vendor_product`
-| `filepath`         | `file_path`
-| `virusname`        | `signature`
-| `scantime`         | `date.sec`
-| `filename`         | `file_name`
-| `username`         | `user`
-| N/A (static value) | `action_enum = 2` (Blocked)
-| N/A (static value) | `date.nanosecond = 0`
+| FluentBit field | CIM::Malware::Attacks member |
+| --------------- | ---------------------------- |
+| `hostname`      | `dest.host`                  |
+| `appName`       | `vendor_product`             |
+| `filepath`      | `file_path`                  |
+| `virusname`     | `signature`                  |
+| `scantime`      | `date.sec`                   |
+| `filename`      | `file_name`                  |
+| `username`      | `user`                       |
 
+It also statically assign the following values:
 
+| CIM::Malware::Attacks member | Value       |
+| ---------------------------- | ----------- |
+| `action_enum`                | 2 (Blocked) |
+| `date.nanosecond`            | 0           |
 
-
+<br/><br/>
 
 ---
 ## Running the test
 
 To run the tests, open 3 terminals (in this order):
-   * Terminal 1: run FluentBit
-   * Terminal 2: run RTI Connext DDS "Spy" utility to view the published data
-   * Terminal 3: produce the scan data
+   * Terminal 1: run FluentBit to publish over DDS the parsed scan results
+   * Terminal 2: run RTI Connext DDS "Spy" utility to view in real time the published data
+   * Terminal 3: simulate the generation of the scan log file
+
+<br/><br/>
 
 ### Terminal 1: Run FluentBit
 
-First of all, make sure you have ConnextDDS environment variable correctly set 
-(by default the Fluent Bit DDS plugin is dynamically linked to ConnextDDS library,
-so you need to have the `LD_LIBRARY_PATH` correctly set. 
-If you built the Fluent Bit DDS Plugins using static libraries, you don't need this step.). 
-Refer to Connext DDS User's manual to set up your environment.
+First of all, make sure you have ConnextDDS environment variable correctly set (by default the Fluent Bit DDS plugin is dynamically linked to ConnextDDS library, so you need to have the `LD_LIBRARY_PATH` correctly set. 
+If you built the Fluent Bit DDS Plugins using static libraries, you don't need this step). Refer to Connext DDS User's manual to set up your environment.
 
-To run FluentBit, first make sure the input file (`log.txt`) exist (empty), 
-then launch FluentBit specifying the DDS Structured output plugin and the
-`mcafee.conf` configuration:
+To run FluentBit, first make sure the input file (`log.txt`) exist (empty), then launch FluentBit specifying the DDS Structured output plugin and the`mcafee.conf` configuration:
 ```
 $ rm ./log.txt
 $ touch ./log.txt
 $ fluent-bit -e /usr/local/lib/flb-out_dds_str.so -c mcafee.conf
 ```
 
+<br/><br/>
 
 ### Terminal 2: Receive the data
 
-To verify that the data is correctly published over RTI Connext DDS, use 
-the utility `rtiddsspy` (included in the RTI Connext distribution DDS) to
-subscribe and print to console:
+To verify that the data is correctly published over RTI Connext DDS, use the utility `rtiddsspy` (included in the RTI Connext distribution DDS) to subscribe and print to console:
 
 ```
 rtiddsspy -domain 0 -printSample
 ```
 
+<br/><br/>
 
 ### Terminal 3: Produce the data
-If you don't have McAfee available, you can use the provided sample file (`mcafee.log`), 
-with the `catdelay` utility (included in the example folder).
-The catdelay is a small C program (included under `examples/catdelay` that reads
-one line at the time from a file and prints it to stdout with a given delay. This
-will allow the simulation of the creation of the log file (`log.txt` as used by the
-three input plug-ins of FluentBit).
 
-If you have not done it before, build the `catdelay` utility just by invoking:
+If you don't have McAfee available, you can use the provided sample file (`mcafee.log`), with the `catdelay` utility (included in the example folder). The catdelay is a small C program (included under `examples/catdelay` that reads one line at the time from a file and prints it to stdout with a given delay. This will allow the simulation of the creation of the log file (`log.txt` as used by the
+three input plug-ins of FluentBit). If you have not done it before, build the `catdelay` utility just by invoking:
 
 ```
 gcc -o catdelay ../catdelay/catdelay.c
 ```
 
-(perhaps copy the binary in a directory that is already included in your search path)
-
-Then from one terminal start the catdelay application :
+Then copy the binary in a directory that is already included in your search path, for example `/usr/local/bin`:
 
 ```
-catdelay 500 mcafee.log > log.txt
+sudo cp catdelay /usr/local/bin
 ```
 
-From the Terminal 2 (the one running `rtiddsspy`) you should see the published
-data with the malware information:
+Then from one terminal start the `simulate-loop.sh` that launch `catdelay` to produce the file `log.txt` from `mcafee.log` at a rate of 4 lines per second:
+
+```
+./simulate-loop.sh
+```
+
+As soon as you press ENTER to start the generation (prompted by the script), FluentBit (Terminal 1) should log messages showing the messages being parsed and processed.
+
+From the Terminal 2 (the one running `rtiddsspy`) you should see the published data with the malware information:
 
 ```
 1575573721.001083  d +M  C0A8129A    MalwareAttacks      CIM_Malware_Attack
