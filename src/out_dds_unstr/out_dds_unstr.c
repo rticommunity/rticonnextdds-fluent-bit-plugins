@@ -35,41 +35,6 @@ struct flb_out_dds_unstr_config {
 
 #define PLUGIN_NAME         "out_dds_unstr"
 
-/* {{{ dds_shutdown
- * -------------------------------------------------------------------------
- */
-static int dds_shutdown(DDS_DomainParticipant *participant) {
-    int status = 0;
-    DDS_ReturnCode_t retcode;
-
-    if (participant != NULL) {
-        retcode = DDS_DomainParticipant_delete_contained_entities(participant);
-        if (retcode != DDS_RETCODE_OK) {
-            flb_error("[%s] delete_contained_entities error %d\n", PLUGIN_NAME, retcode);
-            status = -1;
-        }
-        retcode = DDS_DomainParticipantFactory_delete_participant(
-                DDS_TheParticipantFactory, participant);
-        if (retcode != DDS_RETCODE_OK) {
-            flb_error("[%s] delete_participant error %d\n", PLUGIN_NAME, retcode);
-            status = -1;
-        }
-    }
-    /* RTI Data Distribution Service provides the finalize_instance() method on
-       domain participant factory for users who want to release memory used
-       by the participant factory. Uncomment the following block of code for
-       clean destruction of the singleton. */
-    /*
-       retcode = DDS_DomainParticipantFactory_finalize_instance();
-       if (retcode != DDS_RETCODE_OK) {
-       printf("finalize_instance error %d\n", retcode);
-       status = -1;
-       }
-       */
-    return status;
-}
-
-// }}}
 /* {{{ cb_dds_exit
  * -------------------------------------------------------------------------
  */
@@ -81,7 +46,7 @@ static int cb_dds_exit(void *data,
     }
 
     if (ctx->participant) {
-        dds_shutdown(ctx->participant);
+        FBCommon_shutdownDDS(ctx->participant);
 
     }
 
@@ -132,7 +97,7 @@ static int cb_dds_init(struct flb_output_instance *ins,
             NULL /* listener */, DDS_STATUS_MASK_NONE);
     if (ctx->participant == NULL) {
         flb_error("[%s] create_participant error\n", PLUGIN_NAME);
-        dds_shutdown(ctx->participant);
+        FBCommon_shutdownDDS(ctx->participant);
         goto err;
     }
 
@@ -143,7 +108,7 @@ static int cb_dds_init(struct flb_output_instance *ins,
             DDS_STATUS_MASK_NONE);
     if (ctx->publisher == NULL) {
         flb_error("[%s] create_publisher error\n", PLUGIN_NAME);
-        dds_shutdown(ctx->participant);
+        FBCommon_shutdownDDS(ctx->participant);
         goto err;
     }
 
@@ -153,7 +118,7 @@ static int cb_dds_init(struct flb_output_instance *ins,
             ctx->participant, ctx->type_name);
     if (retcode != DDS_RETCODE_OK) {
         flb_error("[%s] register_type error %d\n", PLUGIN_NAME, retcode);
-        dds_shutdown(ctx->participant);
+        FBCommon_shutdownDDS(ctx->participant);
         goto err;
     }
 
@@ -165,7 +130,7 @@ static int cb_dds_init(struct flb_output_instance *ins,
             DDS_STATUS_MASK_NONE);
     if (ctx->topic == NULL) {
         flb_error(" [%s] create_topic error\n", PLUGIN_NAME);
-        dds_shutdown(ctx->participant);
+        FBCommon_shutdownDDS(ctx->participant);
         goto err;
     }
 
@@ -176,14 +141,14 @@ static int cb_dds_init(struct flb_output_instance *ins,
             &DDS_DATAWRITER_QOS_DEFAULT, NULL /* listener */, DDS_STATUS_MASK_NONE);
     if (ctx->writer == NULL) {
         flb_error("[%s] create_datawriter error\n", PLUGIN_NAME);
-        dds_shutdown(ctx->participant);
+        FBCommon_shutdownDDS(ctx->participant);
         goto err;
     }
 
     ctx->fb_writer = FBDataWriter_narrow(ctx->writer);
     if (ctx->fb_writer == NULL) {
         flb_error("[%s] DataWriter narrow error\n", PLUGIN_NAME);
-        dds_shutdown(ctx->participant);
+        FBCommon_shutdownDDS(ctx->participant);
         goto err;
     }
 
@@ -191,7 +156,7 @@ static int cb_dds_init(struct flb_output_instance *ins,
     ctx->instance = FBTypeSupport_create_data_ex(DDS_BOOLEAN_TRUE);
     if (ctx->instance == NULL) {
         flb_error("[%s] FBTypeSupport_create_data error\n", PLUGIN_NAME);
-        dds_shutdown(ctx->participant);
+        FBCommon_shutdownDDS(ctx->participant);
         goto err;
     }
 

@@ -128,6 +128,41 @@ RTIBool FBCommon_createDDSEntities(struct FBCommon_DDSConfig *ddsArgs,
 }
 
 // }}}
+/* {{{ FBCommon_shutdownDDS
+ * -------------------------------------------------------------------------
+ */
+int FBCommon_shutdownDDS(DDS_DomainParticipant *participant) {
+    int status = 0;
+    DDS_ReturnCode_t retcode;
+
+    if (participant != NULL) {
+        retcode = DDS_DomainParticipant_delete_contained_entities(participant);
+        if (retcode != DDS_RETCODE_OK) {
+            flb_error("delete_contained_entities error %d\n", retcode);
+            status = -1;
+        }
+        retcode = DDS_DomainParticipantFactory_delete_participant(
+                DDS_TheParticipantFactory, participant);
+        if (retcode != DDS_RETCODE_OK) {
+            flb_error("delete_participant error %d\n", retcode);
+            status = -1;
+        }
+    }
+    /* RTI Data Distribution Service provides the finalize_instance() method on
+       domain participant factory for users who want to release memory used
+       by the participant factory. Uncomment the following block of code for
+       clean destruction of the singleton. */
+    /*
+       retcode = DDS_DomainParticipantFactory_finalize_instance();
+       if (retcode != DDS_RETCODE_OK) {
+       printf("finalize_instance error %d\n", retcode);
+       status = -1;
+       }
+       */
+    return status;
+}
+
+// }}}
 /* {{{ FBCommon_readFile
  * -------------------------------------------------------------------------
  */

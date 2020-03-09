@@ -80,6 +80,9 @@ RTIBool FBCommon_createDDSEntities(struct FBCommon_DDSConfig *ddsArgs,
         DDS_DataWriter **writer);
 
 
+// Shuts down the DDS participant and destorys all the contained entities
+int FBCommon_shutdownDDS(DDS_DomainParticipant *part);
+
 /**
  * \brief Reads an entire file from disk
  *

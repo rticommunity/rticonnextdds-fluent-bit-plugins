@@ -84,42 +84,6 @@ static const int64_t  MAX_INT64_TO_OCTET  = RTIXCdrOctet_MAX;  // +0xff
 static const uint64_t MAX_UINT64_TO_LONGLONG  = RTIXCdrLongLong_MAX;
 
 
-/* {{{ dds_shutdown
- * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- */
-static int dds_shutdown(DDS_DomainParticipant *participant)
-{
-    int status = 0;
-    DDS_ReturnCode_t retcode;
-
-    if (participant != NULL) {
-        retcode = DDS_DomainParticipant_delete_contained_entities(participant);
-        if (retcode != DDS_RETCODE_OK) {
-            flb_error("[%s] delete_contained_entities error %d\n", PLUGIN_NAME, retcode);
-            status = -1;
-        }
-        retcode = DDS_DomainParticipantFactory_delete_participant(
-            DDS_TheParticipantFactory, participant);
-        if (retcode != DDS_RETCODE_OK) {
-            flb_error("[%s] delete_participant error %d\n", PLUGIN_NAME, retcode);
-            status = -1;
-        }
-    }
-    /* RTI Data Distribution Service provides the finalize_instance() method on
-    domain participant factory for users who want to release memory used
-    by the participant factory. Uncomment the following block of code for
-    clean destruction of the singleton. */
-    /*
-    retcode = DDS_DomainParticipantFactory_finalize_instance();
-    if (retcode != DDS_RETCODE_OK) {
-        printf("finalize_instance error %d\n", retcode);
-        status = -1;
-    }
-    */
-    return status;
-}
-
-// }}}
 #if 0
 /* {{{ getMemberKind
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1330,7 +1294,7 @@ static int cb_dds_exit(void *data,
     struct flb_out_dds_str_config *ctx = data;
     if (ctx) {
         if (ctx->participant) {
-            dds_shutdown(ctx->participant);
+            FBCommon_shutdownDDS(ctx->participant);
         }
         flb_free(ctx);
     }
