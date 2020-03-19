@@ -1194,6 +1194,7 @@ static const char * setMsgpackFromJson(msgpack_object *value, cJSON *node) {
             *end  = '\0';
             // now envName have the correct env variable name
             msgpack_object_initFromString(value, getenv(envName));
+            *end  = ')';
             return propName;
         }
 
