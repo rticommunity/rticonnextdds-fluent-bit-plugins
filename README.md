@@ -251,6 +251,10 @@ Each `EventMap` is an object that tells how to identify the event in FluentBit (
 * The `static` properties defines an object that statically assign the value of the members of the DDS struct:
   * property name = fully qualified name of the DDS member
   * property value = static value to assign
+  * If the property name starts with '$' (dollar sign), the plugin will interpret the value as a macro that will be substituted with its value. The following macros are currently supported:
+    * `time()`: number (unsigned integer): expands to the current UTC Timestamp
+    * `hostname()`: string: expands to the current host name
+    * `env(ENV_VARIABLE)`: string: expands to the value of the environment variable `ENV_VARIABLE`
 
 Note that only the defined DDS members will be assigned: all the other non-specified members will have their default value (whether defined through the IDL or by the system).
 

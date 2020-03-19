@@ -83,6 +83,8 @@ static const int64_t  MAX_INT64_TO_OCTET  = RTIXCdrOctet_MAX;  // +0xff
 
 static const uint64_t MAX_UINT64_TO_LONGLONG  = RTIXCdrLongLong_MAX;
 
+static char HOSTNAME[100];
+
 
 #if 0
 /* {{{ getMemberKind
@@ -1154,6 +1156,79 @@ static DDS_Boolean setValueToMember(struct flb_out_dds_str_config *ctx, const ms
 }
 
 // }}}
+/* {{{ setMsgpackFromJson
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * Given a JSON node dscribing the JSON node of a static section, assign the
+ * static value to the given msgpack object so it can be passed to the setValueToMember()
+ *
+ * Returns the property name if success or NULL if an error occurred
+ */
+static const char * setMsgpackFromJson(msgpack_object *value, cJSON *node) {
+    const char *propName = &node->string[0];
+
+    // Is a macro (special value, for example $foo.bar) ?
+    if (propName[0] == '$') {
+        // Yes, remove the initial '$' from the property name
+        propName = &propName[1];        // Skip '$' in the property name
+        // Expects the type to be a string
+        if (node->type != cJSON_String) {
+            flb_error("Invalid type in macro value for property %s", propName);
+            return NULL;
+        }
+        if (!strcmp(node->valuestring, "time()")) {
+            value->type = MSGPACK_OBJECT_POSITIVE_INTEGER;
+            value->via.u64 = (uint64_t)time(NULL);
+            return propName;
+        }
+        if (!strcmp(node->valuestring, "hostname()")) {
+            msgpack_object_initFromString(value, HOSTNAME);
+            return propName;
+        }
+        if (!strncmp(node->valuestring, "env(", 4)) {
+            char *envName = node->valuestring + 4;
+            char *end = strchr(envName, ')');
+            if (!end) {
+                flb_error("Missing ')' in env() macro value for property %s", propName);
+                return NULL;
+            }
+            *end  = '\0';
+            // now envName have the correct env variable name
+            msgpack_object_initFromString(value, getenv(envName));
+            return propName;
+        }
+
+        flb_warn("Unkonwn macro '%s' for property '%s'", node->valuestring, node->string);
+        return NULL;
+    }
+
+    switch(node->type) {
+        case cJSON_Number: {
+            double tempDouble;
+            // Can be an integer?
+            if (modf(node->valuedouble, &tempDouble) == 0.0) {
+                value->type = MSGPACK_OBJECT_NEGATIVE_INTEGER;
+                value->via.i64 = tempDouble;
+            } else {
+                value->type = MSGPACK_OBJECT_FLOAT64;
+                value->via.f64 = node->valuedouble;
+            }
+            return propName;
+        }
+        case cJSON_True:
+        case cJSON_False:
+            value->type = MSGPACK_OBJECT_BOOLEAN;
+            value->via.boolean = (node->type == cJSON_True);
+            return propName;
+
+        case cJSON_String:
+            msgpack_object_initFromString(value, node->valuestring);
+            return propName;
+    }
+
+    flb_warn("Cannot map static property '%s': unsupported type (%d)", propName, node->type);
+    return NULL;
+}
+
 
 /* {{{ mapObjectToType
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1242,37 +1317,15 @@ static RTIBool mapObjectToType(const char *tag, struct flb_out_dds_str_config *c
         }
 
         if (staticNode) {
+            const char *propName;
             // Now process the static section
             msgpack_object temp;     // Just a temporary msgpack object to hold the static value
             for (node = staticNode->child; node; node=node->next) {
-                switch(node->type) {
-                    case cJSON_Number: {
-                        double tempDouble;
-                        // Can be an integer?
-                        if (modf(node->valuedouble, &tempDouble) == 0.0) {
-                            temp.type = MSGPACK_OBJECT_NEGATIVE_INTEGER;
-                            temp.via.i64 = tempDouble;
-                        } else {
-                            temp.type = MSGPACK_OBJECT_FLOAT64;
-                            temp.via.f64 = node->valuedouble;
-                        }
-                        break;
-                    }
-                    case cJSON_True:
-                    case cJSON_False:
-                        temp.type = MSGPACK_OBJECT_BOOLEAN;
-                        temp.via.boolean = (node->type == cJSON_True);
-                        break;
-
-                    case cJSON_String:
-                        msgpack_object_initFromString(&temp, node->valuestring);
-                        break;
-
-                    default:
-                        flb_warn("Cannot map static property '%s': unsupported type (%d)", node->string, node->type);
-                        continue;
+                propName = setMsgpackFromJson(&temp, node);
+                if (!propName) {
+                    return RTI_FALSE;
                 }
-                if (!setValueToMember(ctx, &temp, node->string)) {
+                if (!setValueToMember(ctx, &temp, propName)) {
                     flb_warn("failed to assign value for static entry='%s' in tag='%s'", node->string, tag);
                 }
             }
@@ -1366,6 +1419,14 @@ static int cb_dds_init(struct flb_output_instance *ins,
             goto err;
         }
     }
+
+    // Initialize other globals
+    if (gethostname(HOSTNAME, sizeof(HOSTNAME)) == -1) {
+        flb_warn("Error resolving hostname(): %s (errno=%d)", strerror(errno), errno);
+        goto err;
+    }
+
+    //
 
     // Create participant and data writer
     ok = FBCommon_createDDSEntities(&argDDSConfig, &ctx->participant, &untypedWriter);
