@@ -1187,13 +1187,21 @@ static const char * setMsgpackFromJson(msgpack_object *value, cJSON *node) {
         if (!strncmp(node->valuestring, "env(", 4)) {
             char *envName = node->valuestring + 4;
             char *end = strchr(envName, ')');
+            char *envVal;
             if (!end) {
                 flb_error("Missing ')' in env() macro value for property %s", propName);
                 return NULL;
             }
             *end  = '\0';
             // now envName have the correct env variable name
-            msgpack_object_initFromString(value, getenv(envName));
+            envVal = getenv(envName);
+            if (envVal) {
+                msgpack_object_initFromString(value, envVal);
+            } else {
+                // Warning: env variable not defined
+                msgpack_object_initFromString(value, "");
+            }
+
             *end  = ')';
             return propName;
         }
