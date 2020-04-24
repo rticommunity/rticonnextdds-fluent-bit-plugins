@@ -145,5 +145,5 @@ AC_CHECK_FILE("${FBHOME}/include/fluent-bit.h",
 
 dnl AC_SUBST(RTI_LIBS, "${RTI_LIBS}")
 
-AC_OUTPUT(Makefile src/out_dds_unstr/Makefile src/out_dds_str/Makefile src/in_dds_unstr/Makefile)
+AC_OUTPUT(Makefile src/out_dds_unstr/Makefile src/out_dds_str/Makefile)
 
